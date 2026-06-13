@@ -1364,10 +1364,12 @@ Bayesian regression modeling was performed with Stan (@stan2023stan) via the rst
 
 ## Data and code availability
 
-_Placeholder for statement of data and code availability._
+All code and data needed to reproduce this manuscript are available in a public repository at [`https://github.com/securebio/det-mclaren-2026-airplane-wastewater`](https://github.com/securebio/det-mclaren-2026-airplane-wastewater).
+The repository contains the raw inputs (sample metadata, RT-qPCR measurements, Qubit measurements, and MGS pipeline outputs), the data-cleaning scripts that turn these inputs into analysis-ready files, the cleaned files themselves, and the Quarto (@allaire2026quar) source for this manuscript.
+R package versions are pinned with renv (@ushey2026renv) so that the computational environment can be restored and the full pipeline re-run from the committed sources.
 
-Code along with metadata, RT-qPCR measurements, and Qubit measurements will be published on GitHub.
-MGS data with human reads removed is available through the NCBI Sequence Read Archive (SRA) under [BioProject ID PRJNA1460372](http://www.ncbi.nlm.nih.gov/bioproject/1460372).
+Raw MGS data with human reads removed are available through the NCBI Sequence Read Archive (SRA) under [BioProject ID PRJNA1460372](http://www.ncbi.nlm.nih.gov/bioproject/1460372).
+The Massachusetts COVID-19 surveillance data used here are publicly available from the Massachusetts Department of Public Health as described above, and the downloaded archive is also included in the repository.
 
 # Acknowledgments
 
