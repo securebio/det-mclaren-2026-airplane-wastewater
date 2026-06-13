@@ -130,7 +130,7 @@ library(rstanarm)
 options(mc.cores = parallel::detectCores())
 
 # Other packages used: janitor, ggstance, broom, fs, RColorBrewer,
-# readxl, sessioninfo. Hmisc is loaded indirectly by
+# readxl. Hmisc is loaded indirectly by
 # stat_summary(fun.data = "mean_cl_boot"); declare it here so renv tracks it.
 requireNamespace("Hmisc", quietly = TRUE)
 
@@ -791,7 +791,7 @@ These differences further support the idea that microbial RNA from airplane wast
 To clarify the cause of the lower levels of rRNA seen in airplane wastewater among ribodepleted samples, we compared the ratio of ribosomal to non-ribosomal reads in ribodepleted versus non-depleted samples.
 The ratio is moderately lower in airplane versus municipal wastewater in non-depleted libraries, but much lower in depleted libraries (@fig-ribodepletion), indicating that the efficiency of ribodepletion at removing rRNA relative to non-rRNA was greater in airplane samples.
 We estimate ribodepletion efficiency to be approximately 6-fold greater in airplane versus influent samples (@tbl-ribodepletion).
-[Appendix 2](#sec-ribodepletion) discusses possible causes for the lower baseline rRNA levels and improved ribodepletion efficiency seen in airplane wastewater.
+The [Supplemental material](#sec-ribodepletion) discusses possible causes for the lower baseline rRNA levels and improved ribodepletion efficiency seen in airplane wastewater.
 
 ```{r}
 #| label: fig-ribodepletion
@@ -1108,7 +1108,7 @@ The effect could be larger for RNA, for example if metabolic activity is higher 
 
 The underlying mechanism may, however, be more complex.
 The reduced rRNA fraction in airplane samples was partly due to more efficient ribodepletion, potentially contributing a ~2-fold increase in viral relative abundance.
-This efficiency difference could be explained by reduced RNA input in airplane samples or depletion probes having poorer coverage of sewer- than human-derived bacteria ([Appendix 2](#sec-ribodepletion)).
+This efficiency difference could be explained by reduced RNA input in airplane samples or depletion probes having poorer coverage of sewer- than human-derived bacteria ([Supplemental material](#sec-ribodepletion)).
 Before ribodepletion, airplane samples had much lower RNA concentrations (but not DNA) than municipal samples (@fig-qubit), suggesting selective RNA degradation.
 Since filtration removes intact cells, leaving primarily extracellular bacterial RNA, higher pH in airplane wastewater (@filho2017nutr, @hjelmso2019meta) might selectively degrade cell-free bacterial RNA while preserving encapsulated viral RNA.
 Yet, this does not explain the 22-fold increase in the human-associated genus _Bacteroides_.
@@ -1293,7 +1293,7 @@ For a pilot round of MGS, we selected four days in December across two weeks whi
 In prior analysis of comparable public wastewater datasets (@critschristoph2021geno, @rothman2021rnav; analysis not shown) indicated that, even with steps taken to remove bacteria prior to extraction (including both filtration and bacterial ribodepletion), we observed that bacterial rRNA tends to dominate MGS data, with eukaryotic rRNA being a relatively minor component.
 We therefore chose to include a bacterial ribodepletion step during library preparation.
 To assess the efficacy of bacterial ribodepletion, we sequenced each sample with and without ribodepletion, resulting in 32 total sequencing conditions (4 dates × 4 sample sources × 2 ribodepletion states).
-Analysis of the composition of ribodepleted and non-depleted samples confirmed the dominance of bacteria among rRNA sequences and the utility of bacterial ribodepletion for reducing these sequences ([Appendix 2](#sec-ribodepletion)).
+Analysis of the composition of ribodepleted and non-depleted samples confirmed the dominance of bacteria among rRNA sequences and the utility of bacterial ribodepletion for reducing these sequences ([Supplemental material](#sec-ribodepletion)).
 
 Prior to submission for sequencing, we treated a single 15 μL aliquot of purified total nucleic acids to remove DNA using the Invitrogen TURBO DNA-free Kit according to manufacturer's instructions, then split the aliquot in two.
 We then submitted these 32 aliquots for library preparation (including ribodepletion) and sequencing to the MIT BioMicro Center. Aliquot's receiving ribodepletion were treated with the [NEBNext rRNA Depletion Kit (Bacteria)](https://www.neb.com/en-us/products/e7850-nebnext-rrna-depletion-kit-bacteria). Libraries were then prepared for sequencing using the [NEBNext® Ultra™ II Directional RNA Library Prep Kit](https://www.neb.com/en-us/products/e7760-nebnext-ultra-ii-directional-rna-library-prep-kit-for-illumina) and sequenced on the Illumina NovaSeq 6000 platform, generating 2×150bp reads. An incident during library prep required several of the depletion preps to be repeated. The sequencing center redid all depletion preps, resulting in two depleted libraries for 9 of the 16 samples, which we combined the data from prior to our MGS data analysis. In total, these data comprised 3.3B read pairs (RNA; 2.1B with ribodepletion and 1.2B without).
@@ -1315,7 +1315,7 @@ meta_processed |>
   gt_base_styling()
 ```
 
-Non-depleted libraries were dominated by rRNA, and are ill-suited for pathogen monitoring. Therefore we only consider the ribodepleted libraries in our main results. However, the overall efficacy of depletion and its differences between sample types are considered in [Appendix 2](#sec-ribodepletion).
+Non-depleted libraries were dominated by rRNA, and are ill-suited for pathogen monitoring. Therefore we only consider the ribodepleted libraries in our main results. However, the overall efficacy of depletion and its differences between sample types are considered in the [Supplemental material](#sec-ribodepletion).
 
 ## MGS data analysis
 
@@ -1369,7 +1369,33 @@ _Placeholder for statement of data and code availability._
 Code along with metadata, RT-qPCR measurements, and Qubit measurements will be published on GitHub.
 MGS data with human reads removed is available through the NCBI Sequence Read Archive (SRA) under [BioProject ID PRJNA1460372](http://www.ncbi.nlm.nih.gov/bioproject/1460372).
 
-# Appendix 1: Taxonomic composition
+# Acknowledgments
+
+MRM, OSH, ANM, DPR, and WJB received support for this work from Coefficient Giving (formerly Open Philanthropy) via a gift to SecureBio. MRM, OSH, ANM, and WJB also received support for this work from the Musk Foundation via a gift to MIT. The funders had no role in study design, data collection and interpretation, or the decision to submit the work for publication.
+
+We thank Cara Seaman, the DITP sampling team, and Steve Rhode for providing wastewater samples from Deer Island Wastewater Treatment Plant.
+
+The findings and conclusions of this report are those of the authors and do not necessarily represent the official position of the U.S. Centers for Disease Control and Prevention.
+
+# References
+
+::: {#refs}
+:::
+
+```{=latex}
+\clearpage
+% Switch figure and table numbering to supplemental "S" style for everything
+% that follows (Fig. S1, Table S1, ...). Cross-references to these items
+% resolve automatically via the LaTeX counters.
+\setcounter{figure}{0}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\setcounter{table}{0}
+\renewcommand{\thetable}{S\arabic{table}}
+```
+
+# Supplemental material
+
+## Taxonomic composition
 
 We first looked at high-level composition in terms of the fraction of reads classified as ribosomal and at the domain level (for non-ribosomal reads), as reported in the Results (@fig-comp, @tbl-comp).
 
@@ -1555,7 +1581,7 @@ ggplot(virus_family_plot) / ggplot(virus_family_plot_no_virga) +
   ))
 ```
 
-# Appendix 2: Ribosomal composition and depletion {#sec-ribodepletion}
+## Ribosomal composition and depletion {#sec-ribodepletion}
 
 Taxonomic characterization of reads classified as ribosomal indicates that the vast majority of ribosomal RNA (rRNA) in our extractions is bacterial in origin.
 In non-depleted samples, an overwhelming majority of ribosomal reads are classified as bacterial (@fig-comp-rrna, top row).
@@ -1608,7 +1634,7 @@ The lower baseline level of rRNA may be due to the hypothesized greater ratio of
 The greater ribodepletion efficiency (shown in [Results]) may also have multiple explanations.
 First, the lower baseline concentration of rRNA in airplane samples may lead to improved depletion performance. The combination of a lower fraction of rRNA out of all RNA, as seen in non-depleted samples in @fig-ribodepletion, with a lower concentration of total RNA, as seen in @fig-qubit, imply that airplane samples have a much lower concentration of rRNA than municipal samples. Ribodepletion kits can become saturated at overly high rRNA levels, leading to reduced depletion performance---plausibly such saturation is occurring in municipal but not airplane samples. Second, the ribodepletion kit may have better coverage for bacteria in the airplane samples rather than in municipal samples. NEB provides limited information about the bacterial reference sequences used for the design of the probes in their kit. However, it is plausible that the references are biased towards bacteria found in the human rather than sewer microbiome, in which case we can expect ribodepletion to work less efficiently in the sewer-dominated municipal samples.
 
-# Additional tables
+## Supplemental tables
 
 ```{r}
 #| label: tbl-sampling
@@ -1679,7 +1705,7 @@ nb_intervals |>
 \clearpage
 :::
 
-# Additional figures
+## Supplemental figures
 
 ```{r}
 #| label: fig-qubit
@@ -1785,29 +1811,4 @@ p_traj / (p_ratio_traj + p_ratio_dist) +
   )
 ```
 
-::: {.content-visible when-format="pdf"}
-\clearpage
-:::
-
-# Acknowledgments {.appendix}
-
-MRM, OSH, ANM, DPR, and WJB received support for this work from Coefficient Giving (formerly Open Philanthropy) via a gift to SecureBio. MRM, OSH, ANM, and WJB also received support for this work from the Musk Foundation via a gift to MIT. The funders had no role in study design, data collection and interpretation, or the decision to submit the work for publication.
-
-We thank Cara Seaman, the DITP sampling team, and Steve Rhode for providing wastewater samples from Deer Island Wastewater Treatment Plant.
-
-The findings and conclusions of this report are those of the authors and do not necessarily represent the official position of the U.S. Centers for Disease Control and Prevention.
-
-::: {.content-visible unless-format="html"}
-# References
-:::
-
-::: {.content-visible when-format="html"}
-# Session info {.appendix}
-
-<details><summary>Click for session info</summary>
-```{r, R.options = list(width = 83)}
-sessioninfo::session_info()
-```
-</details>
-:::
 
