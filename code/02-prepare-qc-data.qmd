@@ -1,0 +1,134 @@
+---
+title: "Prepare qPCR and Qubit data"
+author: "Mike"
+date: today
+format:
+  html:
+    fig-format: svg
+---
+
+This script reads the raw QuantStudio Results CSVs under
+`data-raw/qpcr/` and the Qubit measurements at
+`data-raw/qubit/measurements.csv`, and writes two analysis-ready files
+to `data/`:
+
+- `data/qpcr.rds`: one row per qPCR well (SARS-CoV-2 / PMMoV targets).
+- `data/qubit.rds`: one row per (sample × Qubit assay) measurement in
+  long format, with concentration columns derived from the raw machine
+  reading and the dilution factor.
+
+```{r setup}
+#| output: false
+library(tidyverse)
+library(fs)
+library(here)
+library(lubridate)
+options(warn = 1)  # print warnings as they occur
+
+source(here("code", "_helpers.R"))
+```
+
+## qPCR
+
+```{r}
+qpcr_files <- dir_ls(here("data-raw", "qpcr"), glob = "*_Results_*.csv") |>
+  tibble(path = _) |>
+  mutate(file = path_file(path))
+
+qpcr_results <- qpcr_files |>
+  mutate(data = map(path, read_qpcr_results_csv)) |>
+  select(-path) |>
+  unnest(data) |>
+  mutate(
+    # Fix the one plate where the NTC well was labeled differently
+    task = if_else(sample == "NTC", "NTC", task),
+    sample = if_else(sample == "NTC", NA_character_, sample),
+    # Correct mislabeled sample IDs: some say "Neg" instead of "NEG", and some
+    # carry a "PR-22####-" year typo that should read "PR-23####-".
+    sample = str_replace(sample, "Neg", "NEG"),
+    sample = str_replace(sample, "^PR-22", "PR-23")
+  )
+
+write_rds(qpcr_results, here("data", "qpcr.rds"))
+```
+
+## Qubit
+
+The raw CSV has columns: `handler`, `date measured`,
+`recorded sample name`, `processed sample name`,
+`Qubit HS RNA (ng/uL)`, `Qubit HS dsDNA (ng/uL)`, `dilution factor`.
+We reshape to long format and derive concentration columns that
+handle out-of-range readings.
+
+```{r}
+qubit_raw <- here("data-raw", "qubit", "measurements.csv") |>
+  read_csv(
+    col_types = cols(
+      handler = "c",
+      `date measured` = "D",
+      `recorded sample name` = "c",
+      `processed sample name` = "c",
+      `Qubit HS RNA (ng/uL)` = "c",
+      `Qubit HS dsDNA (ng/uL)` = "c",
+      `dilution factor` = "d"
+    ),
+    na = ""
+  )
+```
+
+```{r}
+# Assay detection limits used to bound out-of-range readings.
+rna_lower <- 4; rna_upper <- 200
+dna_lower <- 0.1; dna_upper <- 120
+
+qubit <- qubit_raw |>
+  pivot_longer(
+    cols = matches("^Qubit.*\\(ng/uL\\)$"),
+    names_to = "assay",
+    values_to = "conc_chr"
+  ) |>
+  janitor::clean_names() |>
+  rename(
+    measurement_date = date_measured,
+    processed_sample_id = processed_sample_name,
+    recorded_sample_id = recorded_sample_name
+  ) |>
+  filter(conc_chr != "none", startsWith(processed_sample_id, "PR-")) |>
+  relocate(processed_sample_id) |>
+  mutate(
+    na_type = str_extract(assay, "(?<=^Qubit HS )(dsDNA|RNA)"),
+    measurement_year = year(measurement_date) |> as.factor(),
+    is_low_oor = conc_chr == "Low OOR",
+    is_high_oor = conc_chr == "High OOR",
+    conc_machine = case_when(
+      conc_chr %in% c("Low OOR", "High OOR") ~ NA_real_,
+      TRUE ~ as.numeric(conc_chr)
+    ),
+    range_status = case_when(
+      conc_chr %in% c("Low OOR", "High OOR") ~ conc_chr,
+      TRUE ~ "In range"
+    ),
+    input_volume = case_when(
+      measurement_date == as.Date("2024-02-22") & assay == "Qubit HS RNA (ng/uL)" ~ 5,
+      TRUE ~ 2
+    ),
+    conc_machine_oor = case_when(
+      na_type == "RNA"   & conc_chr == "Low OOR"  ~ rna_lower / input_volume,
+      na_type == "RNA"   & conc_chr == "High OOR" ~ rna_upper / input_volume,
+      na_type == "dsDNA" & conc_chr == "Low OOR"  ~ dna_lower / input_volume,
+      na_type == "dsDNA" & conc_chr == "High OOR" ~ dna_upper / input_volume,
+      TRUE ~ conc_machine
+    ),
+    conc_sample = conc_machine * dilution_factor,
+    conc_sample_oor = conc_machine_oor * dilution_factor
+  )
+
+write_rds(qubit, here("data", "qubit.rds"))
+```
+
+## Quick sanity checks
+
+```{r}
+qpcr_results |> count(target, task)
+qubit |> count(assay, range_status)
+```

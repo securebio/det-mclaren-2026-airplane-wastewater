@@ -1,0 +1,16 @@
+# Quarto render outputs
+_output/
+**/*.html
+**/*.pdf
+**/*_files/
+.quarto/
+
+# Fetched-on-first-run external data
+data-raw/public/kraken-standard_20240605-inspect.txt
+
+# Editor / OS cruft
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store

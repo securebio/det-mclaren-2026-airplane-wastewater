@@ -1,0 +1,217 @@
+---
+title: "Prepare MGS data for the manuscript"
+author: "Mike"
+date: today
+format:
+  html:
+    toc: true
+    fig-format: svg
+    fig-dpi: 300
+    fig-width: 8
+    fig-asp: 0.618
+---
+
+This script reads the raw outputs of the NAO Viral MGS Analysis Pipeline
+under `data-raw/mgs/` and builds two `phyloseq` objects in `data/`:
+
+- `data/kraken-phyloseq.rds` — Kraken2 clade abundances. Each feature
+  is a `(taxid, ribosomal)` pair so ribosomal vs. non-ribosomal reads
+  are kept as separate features.
+- `data/hv-phyloseq.rds` — Human-virus clade counts from the
+  pipeline's HV workflow.
+
+Both objects carry sample metadata via the BMC library manifest
+(joined to the processed-sample log).
+
+The Kraken2 standard-DB inspect file is large (~3 GB) and is hosted
+publicly by the Kraken2 maintainers; this script downloads it on first
+run if `data-raw/public/kraken-standard_20240605-inspect.txt` is
+missing. See `data-raw/public/DOWNLOAD.md` for the source URL.
+
+```{r setup}
+#| output: false
+library(tidyverse)
+library(fs)
+library(here)
+library(speedyseq)
+options(warn = 1)  # print warnings as they occur
+
+source(here("code", "_helpers.R"))
+```
+
+## Sample metadata
+
+```{r}
+meta_processed <- here("data", "processed-samples-metadata.rds") |>
+  read_rds()
+
+meta_libraries <- here("data", "libraries.tsv") |>
+  read_tsv(show_col_types = FALSE)
+```
+
+## Pipeline outputs
+
+```{r}
+mgs_path <- here("data-raw", "mgs")
+
+stats <- path(mgs_path, "results", "qc", "qc_basic_stats.tsv.gz") |>
+  read_tsv(show_col_types = FALSE) |>
+  mutate(stage = str_replace(stage, "raw_concat", "raw")) |>
+  arrange(sample)
+
+stats_wide <- stats |>
+  select(sample, stage, n_read_pairs) |>
+  pivot_wider(
+    names_from = stage, values_from = n_read_pairs,
+    names_prefix = "n_read_pairs_"
+  )
+```
+
+## Build per-(submission-sample) metadata
+
+The pipeline combines libraries with the same submission_sample_id, so
+metadata at the analysis level is keyed by `submission_sample_id` (here
+renamed to `sample`).
+
+```{r}
+meta <- meta_libraries |>
+  select(-library_id, -index_sequences, -provider_prep_batch) |>
+  distinct() |>
+  mutate(.after = library_preparation_method,
+    ribo_depleted = str_detect(library_preparation_method, "rRNA Depletion")
+  ) |>
+  mutate(
+    sample_type = fct_relevel(sample_type, "sludge", "influent", "airplane")
+  ) |>
+  rename(sample = submission_sample_id) |>
+  left_join(stats_wide, by = "sample")
+```
+
+## Taxonomy workflow
+
+```{r}
+kraken <- path(mgs_path, "results", "taxonomy", "kraken_reports_merged.tsv.gz") |>
+  read_tsv(col_types = "nnnnnciccl")
+```
+
+Get the Kraken2 standard-DB taxonomy via `kraken2-inspect` output. Cache
+the subset to `_output/` so this slow step runs once per repo clone.
+
+```{r}
+inspect_path <- here("data-raw", "public", "kraken-standard_20240605-inspect.txt")
+if (!file.exists(inspect_path)) {
+  message("Downloading kraken2-inspect output (~3 GB)...")
+  download.file(
+    "https://genome-idx.s3.amazonaws.com/kraken/standard_20240605/inspect.txt",
+    inspect_path
+  )
+}
+
+cache_path <- here("_output", "kraken_inspect_subset.rds")
+if (!file.exists(cache_path)) {
+  message("Parsing inspect.txt (slow; cached after first run)...")
+  kraken_inspect <- inspect_path |>
+    read_kraken_reports(minimizers = FALSE) |>
+    select(-file) |>
+    kraken_add_taxonomy()
+  kraken_inspect_subset <- kraken_inspect |>
+    filter(taxid %in% kraken$taxid)
+  rm(kraken_inspect)
+  dir_create(path_dir(cache_path))
+  write_rds(kraken_inspect_subset, cache_path)
+} else {
+  kraken_inspect_subset <- read_rds(cache_path)
+}
+```
+
+Build a wide taxonomy table restricted to the standard Linnaean ranks.
+
+```{r}
+rns <- c("root", "domain", "kingdom", "phylum", "class",
+         "order", "family", "genus", "species")
+names(rns) <- rns |> map_chr(\(x) str_sub(x, 1, 1) |> str_to_upper())
+rns_map <- set_names(names(rns), rns)
+
+tax <- kraken_inspect_subset |>
+  filter(str_detect(rank_code, "[0-9]", negate = TRUE)) |>
+  select(taxid, rank_code, taxonomy) |>
+  mutate(
+    taxonomy = taxonomy |>
+      str_remove(";$") |>
+      str_split(";") |>
+      map(\(x) str_split_fixed(x, "__", 2) |>
+        as_tibble(.name_repair = \(x) c("path_rank", "path_name"))
+      )
+  ) |>
+  unnest(taxonomy) |>
+  filter(str_detect(path_rank, "[0-9]", negate = TRUE)) |>
+  pivot_wider(names_from = path_rank, values_from = path_name) |>
+  # Change rank names from single-letter abbreviation to full name; and ensure
+  # ranks are in the correct order; needed because Kingdom only appears for
+  # eukaryotes and so can end up last
+  select(rank = rank_code, any_of(rns_map), taxid) |>
+  mutate(rank = fct_recode(rank, !!!rns_map)) |>
+  # Add row for unclassified
+  add_row(.before = 1, taxid = 0L, rank = "unclassified")
+```
+
+### Assemble phyloseq object
+
+```{r}
+otu_split <- kraken |>
+  arrange(taxid, ribosomal) |>
+  transmute(
+    .feature = str_glue("{taxid}_{ribosomal}"),
+    sample,
+    .abundance = n_reads_clade
+  ) |>
+  pivot_wider(names_from = sample, values_from = .abundance, values_fill = 0) |>
+  speedyseq::otu_table(taxa_are_rows = TRUE)
+
+tax_split <- tax |>
+  crossing(ribosomal = c(FALSE, TRUE)) |>
+  unnest(ribosomal) |>
+  mutate(.before = 1, feature = str_glue("{taxid}_{ribosomal}")) |>
+  relocate(rank, .after = last_col()) |>
+  # We convert taxid to string before passing to tax_table, otherwise tax_table
+  # will add whitespace padding to small numbers during its own conversion
+  mutate(across(taxid, as.character)) |>
+  tax_table()
+
+ps <- phyloseq(meta |> sample_data(), otu_split, tax_split)
+rm(otu_split)
+
+# Per-sample total reads = sum of reads at the unclassified + root nodes
+# (taxids 0 and 1), summed across ribosomal and non-ribosomal features.
+ss <- ps |>
+  filter_tax_table(taxid %in% c("0", "1")) |>
+  sample_sums()
+
+ps <- ps |>
+  mutate_sample_data(
+    sample_sum = unname(ss)
+  )
+
+write_rds(ps, here("data", "kraken-phyloseq.rds"))
+```
+
+## HV workflow
+
+```{r}
+hv_clade_counts <- path(mgs_path, "results", "hv", "hv_clade_counts.tsv.gz") |>
+  read_tsv(show_col_types = FALSE)
+
+hv_tax <- hv_clade_counts |>
+  select(taxid, rank, name) |>
+  distinct() |>
+  tax_table()
+
+hv_otu <- hv_clade_counts |>
+  select(taxid, sample, n_reads_clade) |>
+  pivot_wider(names_from = sample, values_from = n_reads_clade, values_fill = 0) |>
+  speedyseq::otu_table(taxa_are_rows = TRUE)
+
+hv_ps <- phyloseq(meta |> sample_data(), hv_otu, hv_tax)
+
+write_rds(hv_ps, here("data", "hv-phyloseq.rds"))
+```

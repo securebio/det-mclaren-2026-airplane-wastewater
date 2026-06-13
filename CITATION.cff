@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite the accompanying manuscript:"
+title: "Metagenomic sequencing of composite airplane wastewater for surveillance of emerging viruses — code and data"
+authors:
+  - family-names: McLaren
+    given-names: Michael R.
+  - family-names: Hershey
+    given-names: Olivia S.
+  - family-names: Machtinger
+    given-names: Ari N.
+  - family-names: Rice
+    given-names: Daniel P.
+  - family-names: Simas
+    given-names: Alexandra M.
+  - family-names: Friedman
+    given-names: Cindy R.
+  - family-names: Gratalo
+    given-names: Dawn
+  - family-names: Philipson
+    given-names: Casandra W.
+  - family-names: Bradshaw
+    given-names: William J.
+license: MIT
+preferred-citation:
+  type: article
+  title: "Metagenomic sequencing of composite airplane wastewater for surveillance of emerging viruses"
+  authors:
+    - family-names: McLaren
+      given-names: Michael R.
+    - family-names: Hershey
+      given-names: Olivia S.
+    - family-names: Machtinger
+      given-names: Ari N.
+    - family-names: Rice
+      given-names: Daniel P.
+    - family-names: Simas
+      given-names: Alexandra M.
+    - family-names: Friedman
+      given-names: Cindy R.
+    - family-names: Gratalo
+      given-names: Dawn
+    - family-names: Philipson
+      given-names: Casandra W.
+    - family-names: Bradshaw
+      given-names: William J.
+  date-published: 2026-01-30
+  journal: medRxiv
+  issn: "3067-2007"
+  start: "2026.01.29.26343714"
+  doi: 10.64898/2026.01.29.26343714
+  url: "https://doi.org/10.64898/2026.01.29.26343714"
+  notes: Preprint

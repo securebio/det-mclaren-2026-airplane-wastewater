@@ -1,0 +1,42 @@
+sheet,column name,new column name,readr_col_type,units,description
+Collected samples,sample name,collected_sample_id,c,,
+Collected samples,date collected,collection_date,D,,
+Collected samples,sample source,sample_source,c,,
+Collected samples,bottle #,collected_bottle_number,i,,number indexing bottles of the sample sample source and date
+Collected samples,receiver,sample_received_by,c,,
+Collected samples,collection site,sample_collection_site,c,,
+Collected samples,sample type,sample_type,c,,
+Collected samples,sample desc,sample_description,c,,
+Collected samples,date received,sample_received_date,D,,YYYY-MM-DD
+Collected samples,time received,sample_received_time,t,,
+Collected samples,initial volume (mL),sample_initial_volume,n,mL,
+Collected samples,sample source modifier,sample_source_modifier,c,,
+Processed samples,processed sample name,processed_sample_id,c,,
+Processed samples,date processed,processed_date,D,,
+Processed samples,handler,sample_processed_by,c,,
+Processed samples,collected sample name,collected_sample_id,c,,
+Processed samples,replicate #,processed_replicate_number,i,,
+Processed samples,# stored aliquots,number_stored_aliquots,i,,
+Processed samples,qPCR,qpcr_date,D,,
+Processed samples,qPCR from aliquot number,aliquot_number_for_qpcr,i,,
+Processed samples,notes,processed_notes,c,,
+Extraction aliquots,processed sample name,processed_sample_id,c,,
+Extraction aliquots,aliquot #,extraction_aliquot_number,i,,Integer indexing aliquots of an extraction
+Extraction aliquots,aliquot name,extraction_aliquot_id,c,,
+Extraction aliquots,sample type,processed_sample_type,c,,sample source or 'neg'. A property of the processed sample.
+Extraction aliquots,volume initial,extraction_aliquot_volume_initial,n,,
+Submitted for sequencing,submitted sample name,submission_sample_id,c,,
+Submitted for sequencing,source aliquot,submission_extraction_aliquot_id,c,,
+Submitted for sequencing,sequencing experiment name,submission_experiment_name,c,,
+Submitted for sequencing,date prepared,submission_preparation_date,D,,Date when we prepared the NA sample for submission to sequencer; not necessarily when library prep took place
+Submitted for sequencing,date submitted,submission_date,D,,Date when the sample was submitted to the sequencer
+Submitted for sequencing,location,submission_aliquot_location,c,,
+Submitted for sequencing,preparation treatment ,submission_preparation_treatment,c,,
+Submitted for sequencing,material submitted,submission_material_submitted,c,,
+Submitted for sequencing,original concentration (ng/uL),submission_original_concentration,n,ng/uL,Concentration prior to any dilution before submission
+Submitted for sequencing,concentration relative to original,submission_concentration_relative_to_original,n,,
+Submitted for sequencing,volume submitted (uL),submission_volume,n,uL,
+Submitted for sequencing,concentration submitted (ng/uL),submission_concentration,n,ng/uL,
+Submitted for sequencing,total submitted (ng),submission_total,n,ng,Total amount of DNA or RNA submitted; equal to submitted volume * submitted concentration
+Submitted for sequencing,library preparation abbrev,library_preparation_abbrev,c,,
+Submitted for sequencing,library preparation method,library_preparation_method,c,,

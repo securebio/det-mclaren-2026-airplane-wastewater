@@ -1,0 +1,57 @@
+Date: Mon, Apr 1, 2024 at 9:26 AM
+Subject: Illumina Data Ready 240212Esv - please note
+
+
+Hello,
+
+The data from your experiment are ready to be downloaded from the BioMicro servers.
+
+Please ntoe that the samples in this project were prepped twice due to a loss of a sample during pooling (broken tube). While not all samples are present in both preps, there should be more than enough technical replicates to allow any batch correction required.
+
+Here is a summary of the samples from this flowcell (6656R) sequenced as:
+151 + 151 bases pair-end run with 10 + 24 nucleotide indexes
+
+240212Esv/
+    D24-138003 : 12-05-DNI-deplete (TGGAAGCA+GTACTCTC)
+    D24-138004 : 12-05-DSI-deplete (CAATAGCC+TGCGTAGA)
+    D24-138005 : 12-08-BST-deplete (CTCGAACA+GGAATTGC)
+    D24-138006 : 12-08-DCS-deplete (GGCAAGTT+CTTCTGAG)
+    D24-138007 : 12-08-DNI-deplete (AGCTACCA+CTTAGGAC)
+    D24-138010 : 12-12-DCS-deplete (TTACGTGC+CAAGGTCT)
+    D24-138011 : 12-12-DNI-deplete (AGCTAAGC+GTAACGAC)
+    D24-138012 : 12-12-DSI-deplete (AAGACACC+TCGGTTAC)
+    D24-138013 : 12-15-BST-deplete (CAACTCCA+ACGGATTC)
+    D24-138014 : 12-15-DCS-deplete (GATCTTGC+TGCTCATG)
+    D24-138016 : 12-15-DSI-deplete (CTCGACTT+GGTCAGAT)
+    D24-138017 : 12-05-BST-nodeplete (GTACACCT+CATGAGGA)
+    D24-138018 : 12-05-DCS-nodeplete (CCAAGGTT+GCTATCCT)
+    D24-138019 : 12-05-DNI-nodeplete (GAACGGTT+ATTCCTCC)
+    D24-138020 : 12-05-DSI-nodeplete (CCAGTTGA+ATGACGTC)
+    D24-138021 : 12-08-BST-nodeplete (GTCATCGT+TTAAGCGG)
+    D24-138022 : 12-08-DCS-nodeplete (CAATGCGA+AGTTCGTC)
+    D24-138023 : 12-08-DNI-nodeplete (GGTTGAAC+AACGTGGA)
+    D24-138024 : 12-08-DSI-nodeplete (CTTCGGTT+CTCTGGTT)
+    D24-138025 : 12-12-BST-nodeplete (CGGCATTA+TGACTGAC)
+    D24-138026 : 12-12-DCS-nodeplete (CACGCAAT+ATGGAAGG)
+    D24-138027 : 12-12-DNI-nodeplete (GGAATGTC+GTGTTCCT)
+    D24-138028 : 12-12-DSI-nodeplete (TGGTGAAG+GCTGTAAG)
+    D24-138029 : 12-15-BST-nodeplete (GGACATCA+TGCAGGTA)
+    D24-138030 : 12-15-DCS-nodeplete (GGTGTACA+TAGCGTCT)
+    D24-138031 : 12-15-DNI-nodeplete (GATAGCCA+CTGTGTTG)
+    D24-138032 : 12-15-DSI-nodeplete (CCACAACA+TGTGGTAC)
+    D24-138101 : 12-05-BST-deplete (CGAATACG+GTCGGTAA)
+    D24-138102 : 12-05-DCS-deplete (GTCCTTGA+TCAGACGA)
+    D24-138103 : 12-05-DNI-deplete (CAGTGCTT+ACCTGGAA)
+    D24-138105 : 12-08-BST-deplete (GTCGATTG+ACGGTCTT)
+    D24-138106 : 12-08-DCS-deplete (ATAACGCC+TGAACCTG)
+    D24-138107 : 12-08-DNI-deplete (GCCTTAAC+AGCTCCTA)
+    D24-138108 : 12-08-DSI-deplete (GGTATAGG+CTGGAGTA)
+    D24-138109 : 12-12-BST-deplete (TCTAGGAG+AGGTCACT)
+    D24-138110 : 12-12-DCS-deplete (TGCGTAAC+GATAGGCT)
+    D24-138111 : 12-12-DNI-deplete (CTTGCTAG+GGAGATGA)
+    D24-138113 : 12-15-BST-deplete (TATGGCAC+TCTCGCAA)
+    D24-138114 : 12-15-DCS-deplete (GAATCACC+CTTCGTTC)
+    D24-138115 : 12-15-DNI-deplete (GTAAGGTG+GCAATTCG)
+    D24-138116 : 12-15-DSI-deplete (CGAGAGAA+TCTCTTCC)
+
+(download instructions deleted)

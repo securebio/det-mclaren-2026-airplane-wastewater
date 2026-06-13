@@ -1,0 +1,23 @@
+% Source - https://stackoverflow.com/a/75043433
+% Posted by Shafee, modified by community. See post 'Timeline' for change history
+% Retrieved 2026-01-06, License - CC BY-SA 4.0
+
+$if(title)$
+\title{$title$$if(thanks)$\thanks{$thanks$}$endif$}
+$endif$
+
+$if(subtitle)$
+\subtitle{$subtitle$}
+$endif$
+
+$for(by-author)$
+\author[$for(it.affiliations)$$it.number$$sep$,$endfor$]{$it.name.literal$$if(it.email)$\thanks{Correspondence: $it.email$}$endif$}
+$endfor$
+
+$if(by-affiliation)$
+$for(by-affiliation)$
+\affil[$it.number$]{$it.name$$if(it.city)$, $it.city$$endif$$if(it.region)$, $it.region$$endif$$if(it.country)$, $it.country$$endif$}
+$endfor$
+$endif$
+
+\date{$date$}

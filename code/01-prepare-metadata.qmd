@@ -1,0 +1,174 @@
+---
+title: "Prepare sample metadata and BMC library manifest"
+author: "Mike"
+date: today
+format:
+  html:
+    fig-format: svg
+---
+
+This script reads the redacted sample-log exports and the BMC notification
+email under `data-raw/`, joins them into two analysis-ready tables, and
+writes them to `data/`:
+
+- `data/processed-samples-metadata.rds`: one row per PR-experiment
+  extraction; carries collection-side fields from the matching collected
+  sample.
+- `data/libraries.tsv`: one row per BMC sequencing library; carries
+  all upstream fields via the (library → submission → aliquot → processed →
+  collected) join chain.
+
+```{r setup}
+#| output: false
+library(tidyverse)
+library(fs)
+library(here)
+options(warn = 1)  # print warnings as they occur
+```
+
+## Read sample-log CSVs using the dictionary
+
+```{r dict}
+dict <- here("data-raw", "sample-log", "dictionary.csv") |>
+  read_csv(show_col_types = FALSE) |>
+  janitor::clean_names()
+```
+
+```{r import-function}
+#' Read one sheet CSV, using the dictionary to set column types and rename.
+read_log_sheet <- function(sheet_name, file) {
+  d <- dict |> filter(sheet == sheet_name)
+  col_types <- str_c(d$readr_col_type, collapse = "")
+  x <- read_csv(file, col_types = col_types, na = c("", "NA", "#N/A", "none"))
+  stopifnot(identical(names(x), d$column_name))
+  rename_lookup <- set_names(d$column_name, d$new_column_name)
+  x |>
+    rename(all_of(rename_lookup)) |>
+    filter(!if_all(everything(), is.na))
+}
+```
+
+```{r read-sheets}
+log_collected <- read_log_sheet(
+  "Collected samples",
+  here("data-raw", "sample-log", "collected-samples.csv")
+) |>
+  mutate(sample_received_time = hms::as_hms(sample_received_time))
+
+log_processed <- read_log_sheet(
+  "Processed samples",
+  here("data-raw", "sample-log", "processed-samples.csv")
+)
+
+log_aliquots <- read_log_sheet(
+  "Extraction aliquots",
+  here("data-raw", "sample-log", "extraction-aliquots.csv")
+)
+
+log_sequencing <- read_log_sheet(
+  "Submitted for sequencing",
+  here("data-raw", "sample-log", "submitted-for-sequencing.csv")
+)
+```
+
+## Parse BMC notification email
+
+The BMC email lists one line per sequenced library in the format
+`    D24-NNNNNN : <submission_sample_id> (<i7+i5>)`. We extract those
+lines and build the library table.
+
+```{r}
+email_lines <- here("data-raw", "bmc-email.txt") |> read_lines()
+lib_lines <- email_lines |>
+  str_subset("^    D24-[0-9]+ : ")
+
+provider <- tibble(raw = lib_lines) |>
+  mutate(
+    raw = raw |>
+      str_replace("^ +", "") |>
+      str_replace(" : ", " ") |>
+      str_replace_all("\\(|\\)", "")
+  ) |>
+  separate(raw,
+    into = c("library_id_short", "submission_sample_id", "index_sequences"),
+    sep = " "
+  ) |>
+  mutate(
+    library_id = str_c("240212Esv_6656R_", library_id_short),
+    provider = "MIT BioMicro Center",
+    provider_abbrev = "MIT BMC",
+    # The first prep batch was D24-138001..138032; the second was
+    # D24-138101 onward (a re-prep after a broken-tube incident).
+    provider_library_number = str_extract(library_id, "(?<=D24-)[0-9]+$") |>
+      as.integer(),
+    provider_prep_batch = if_else(provider_library_number >= 138101, 2L, 1L),
+    library_layout = "Paired-end",
+    platform = "Illumina",
+    instrument_model = "NovaSeq 6000"
+  ) |>
+  select(-provider_library_number, -library_id_short) |>
+  relocate(library_id)
+```
+
+## Build BMC library manifest
+
+Same `sample_source` / `sample_type` recodes apply here as for the
+processed-samples table.
+
+```{r}
+bmc_libraries <- provider |>
+  left_join(log_sequencing, by = "submission_sample_id") |>
+  rename(extraction_aliquot_id = submission_extraction_aliquot_id) |>
+  left_join(log_aliquots, by = "extraction_aliquot_id") |>
+  left_join(log_processed, by = "processed_sample_id") |>
+  left_join(log_collected, by = "collected_sample_id") |>
+  mutate(
+    sample_source = fct_recode(sample_source, "BOS" = "BST"),
+    sample_type = fct_recode(sample_type, "airplane" = "triturator inflow")
+  )
+
+write_tsv(bmc_libraries, here("data", "libraries.tsv"))
+```
+
+## Build processed-sample metadata
+
+Join processed samples to their collected-sample fields. Negative
+controls have no collected sample, so we fill in their `sample_source`
+/ `sample_type` / `sample_description` based on the `-NEG` token in
+the processed-sample ID and pair them with the wastewater samples
+they were processed alongside by setting their `collection_date` to
+the processing date.
+
+Two further recodes apply: `BST` → `BOS` for `sample_source`
+(reflecting the publication name of the airport site), and
+`triturator inflow` → `airplane` for `sample_type` (the descriptive
+label used throughout the manuscript).
+
+```{r}
+processed_samples_metadata <- log_processed |>
+  left_join(log_collected, by = "collected_sample_id") |>
+  mutate(
+    is_neg = str_detect(processed_sample_id, "-NEG"),
+    sample_source = if_else(is_neg, "NEG", sample_source),
+    sample_type = if_else(is_neg, "negative control", sample_type),
+    sample_description = if_else(is_neg, "negative control", sample_description),
+    collection_date = if_else(is_neg, processed_date, collection_date),
+    sample_source = fct_recode(sample_source, "BOS" = "BST"),
+    sample_type = fct_recode(sample_type, "airplane" = "triturator inflow") |>
+      fct_relevel("sludge", "influent", "airplane")
+  ) |>
+  select(-is_neg)
+
+write_rds(
+  processed_samples_metadata,
+  here("data", "processed-samples-metadata.rds")
+)
+```
+
+## Quick sanity checks
+
+```{r}
+processed_samples_metadata |> count(sample_type)
+processed_samples_metadata |> count(sample_source)
+bmc_libraries |> count(submission_sample_id) |> count(n, name = "n_libs")
+```

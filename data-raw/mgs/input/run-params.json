@@ -1,0 +1,16 @@
+{
+    "mode": "run",
+    "base_dir": "s3://<bucket>/NAO-240212Esv-2",
+    "raw_dir": "s3://<private-bucket>/NAO-240212Esv/raw/",
+    "ref_dir": "s3://<bucket>/index-20240714/output",
+    "library_tab": "/home/ec2-user/mgs-workflow-batch/NAO-240212Esv/NAO-240212Esv-libraries.csv",
+    "sample_tab": "/home/ec2-user/mgs-workflow-batch/NAO-240212Esv/NAO-240212Esv-samples.csv",
+    "adapters": "/home/ec2-user/mgs-workflow-batch/repo/ref/adapters.fasta",
+    "n_reads_profile": 1000000,
+    "bt2_score_threshold": 20,
+    "blast_hv_fraction": 0,
+    "kraken_memory": "128 GB",
+    "quality_encoding": "phred33",
+    "r1_suffix": "_1",
+    "r2_suffix": "_2"
+}

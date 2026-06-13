@@ -1,0 +1,1813 @@
+---
+title: "Metagenomic sequencing of composite airplane wastewater for surveillance of emerging viruses"
+author:
+  - name: Michael R. McLaren
+    email: mike@securebio.org
+    orcid: 0000-0003-1575-473X
+    affiliations:
+      - ref: securebio
+      - ref: mit
+    corresponding: true
+  - name: Olivia S. Hershey
+    orcid: 0000-0002-6987-6217
+    affiliations:
+      - ref: securebio
+      - ref: mit
+  - name: Ari N. Machtinger
+    affiliations:
+      - ref: securebio
+      - ref: mit
+  - name: Daniel P. Rice
+    orcid: 0000-0002-9509-2694
+    affiliations:
+      - ref: securebio
+  - name: Alexandra M. Simas
+    orcid: 0000-0003-0242-1442
+    affiliations:
+      - ref: ginkgo
+  - name: Cindy R. Friedman
+    affiliations:
+      - ref: cdc
+  - name: Dawn Gratalo
+    affiliations:
+      - ref: ginkgo
+  - name: Casandra W. Philipson
+    affiliations:
+      - ref: ginkgo
+  - name: William J. Bradshaw
+    orcid: 0000-0002-7345-3866
+    affiliations:
+      - ref: securebio
+      - ref: mit
+affiliations:
+  - id: securebio
+    name: SecureBio
+    city: Cambridge
+    state: MA
+    country: USA
+  - id: mit
+    name: Media Laboratory, Massachusetts Institute of Technology
+    city: Cambridge
+    state: MA
+    country: USA
+  - id: ginkgo
+    name: Ginkgo Bioworks
+    city: Boston
+    state: MA
+    country: USA
+  - id: cdc
+    name: Centers for Disease Control and Prevention
+    city: Atlanta
+    state: GA
+    country: USA
+date: last-modified
+categories: [ ]
+draft: false
+bibliography: references.bib
+execute:
+  echo: false
+  warning: true
+  cache: false
+knitr:
+  opts_chunk:
+    message: false
+# Format options that apply to all output types
+toc: true
+number-sections: false
+fig-dpi: 300
+fig-width: 8
+fig-asp: 0.618
+df-print: kable
+html-table-processing: none
+format:
+  html:
+    toc-depth: 1
+    fig-format: svg
+    keep-md: false
+    embed-resources: true
+  pdf:
+    toc-depth: 1
+    fig-format: pdf
+    colorlinks: true
+    keep-tex: false
+    documentclass: scrartcl
+    template-partials:
+      - title.tex
+    include-in-header:
+      text: |
+        \usepackage[noblocks]{authblk}
+        \renewcommand*{\Authsep}{, }
+        \renewcommand*{\Authand}{, }
+        \renewcommand*{\Authands}{, }
+        \renewcommand\Affilfont{\small}
+---
+
+```{css echo=FALSE}
+figure.quarto-float-tbl figcaption.quarto-float-caption-top {
+  text-align: left;
+}
+```
+
+```{r r-setup}
+set.seed(42)
+
+library(tidyverse)
+library(here)
+# Declare this file's location so here::here() resolves to the repo root.
+here::i_am("manuscript/index.qmd")
+library(gt)
+
+library(ggforce)
+library(cowplot)
+library(patchwork)
+library(ggdist)
+library(ggbeeswarm)
+theme_set(theme_cowplot())
+
+library(speedyseq)
+
+library(rstanarm)
+options(mc.cores = parallel::detectCores())
+
+# Other packages used: janitor, ggstance, broom, fs, RColorBrewer,
+# readxl, sessioninfo. Hmisc is loaded indirectly by
+# stat_summary(fun.data = "mean_cl_boot"); declare it here so renv tracks it.
+requireNamespace("Hmisc", quietly = TRUE)
+
+# Okabe Ito color scheme with amber for yellow; see
+# https://easystats.github.io/see/reference/scale_color_okabeito.html
+colors_oi <- grDevices::palette.colors()
+colors_oi['yellow'] <- "#F5C710"
+colors_oi <- colors_oi |> unname()
+
+colors_sample_source <- colors_oi[c(1:5, 7)] |>
+  set_names(c("BOS", "DCS", "DNI", "DSI", "WWScan", "NEG"))
+colors_sample_source_plot <- colors_oi[c(1:4)] |>
+  set_names(c("airplane", "sludge", "influent (South)", "influent (North)"))
+colors_sample_type <- colors_oi[c(1:3)] |>
+  set_names(c("airplane", "sludge", "influent"))
+shapes_sample_type <- c("airplane" = 15, "sludge" = 16, "influent" = 17)
+# Gather labels and scales to reuse for plots where we set color and shape to
+# sample type
+colors_and_shapes_sample_type <- list(
+  labs(color = "Sample type", shape = "Sample type"),
+  scale_color_manual(values = colors_sample_type, guide = guide_legend(reverse = FALSE)),
+  scale_shape_manual(values = shapes_sample_type, guide = guide_legend(reverse = FALSE))
+)
+fill_sample_type <- list(
+  labs(fill = "Sample type"),
+  scale_fill_manual(values = colors_sample_type, guide = guide_legend(reverse = FALSE))
+)
+
+# Base gt table settings
+gt_base_styling <- function(x) {
+  x |>
+    sub_missing() |>
+    tab_style(
+      style = list(
+        cell_text(weight = "bold")
+        # cell_fill(color = "grey90")
+      ),
+      locations = cells_column_labels()
+    ) |>
+    cols_align(
+      align = "left",
+      columns = c(where(is.character), where(is.factor))
+    ) |>
+    cols_align(
+      align = "right",
+      columns = where(is.numeric)
+    ) |>
+    # Center confidence/credible intervals
+    cols_align(
+      align = "center",
+      columns = ends_with("interval")
+    ) |>
+    tab_style(
+      style = cell_fill(color = "#CAFDA8"),
+      locations = cells_row_groups()
+    ) |>
+    # Explicitly set format for dates to prevent convertion to integer in latex
+    # output
+    fmt_date(
+      columns = where(is.Date),
+      date_style = "iso",
+    )
+}
+```
+
+```{r functions}
+odds <- function(x) {x / (1 - x)}
+inv_odds <- function(y) {y / (1 + y)}
+gm_mean <- function(x, ...) {exp(mean(log(x), ...))}
+```
+
+```{r data-import}
+# Function for making modifications to the sample metadata across phyloseq
+# objects as well as the `meta_processed` table.
+#
+# The BST -> BOS / triturator-inflow -> airplane recodes and the negative-
+# control collection_date fix are baked into the cleaning scripts
+# (code/01-prepare-metadata.qmd); this function applies only the
+# presentation-layer transformations the manuscript needs on top.
+update_sample_data <- function(x) {
+  if (isa(x, "phyloseq")) {
+    rename_fun <- speedyseq::rename_sample_data
+    mutate_fun <- speedyseq::mutate_sample_data
+  } else {
+    rename_fun <- dplyr::rename
+    mutate_fun <- dplyr::mutate
+  }
+  x |>
+    rename_fun(
+      collection_site = sample_collection_site
+    ) |>
+    mutate_fun(
+      sample_type = fct_relevel(sample_type, "airplane", "influent", "sludge"),
+      collection_site_long = replace_values(collection_site,
+        "BOS" ~ "Boston Logan International Airport",
+        "DITP" ~ "Deer Island Treatment Plant"
+      ),
+      sample_source_plot = fct_recode(sample_source,
+        "airplane" = "BOS",
+        "sludge" = "DCS",
+        "influent (North)" = "DNI",
+        "influent (South)" = "DSI",
+      ),
+      sample_source_plot_alt = str_glue("{sample_source} ({sample_type})"),
+      collection_site_plot = str_glue("{collection_site_long} ({collection_site})")
+    )
+}
+# Data for MGS analysis
+## Kraken2 clade abundances from taxonomy workflow; phyloseq object includes metadata
+ps_tax <- read_rds(here("data", "kraken-phyloseq.rds")) |>
+  update_sample_data()
+## HV clade-count abundances
+ps_hv <- read_rds(here("data", "hv-phyloseq.rds")) |>
+  update_sample_data()
+# Data for qubit and qpcr analysis
+## metadata for processed samples
+meta_processed <- here("data", "processed-samples-metadata.rds") |>
+  read_rds() |>
+  update_sample_data()
+## qubit data
+qubit <- here("data", "qubit.rds") |>
+  read_rds() |>
+  filter(
+    na_type %in% c("dsDNA", "RNA"),
+  ) |>
+  mutate(
+    # We don't need units in the assay name in our plots
+    assay = str_replace(assay, " \\(ng/uL\\)", "")
+  ) |>
+  filter(
+    # Only keep target samples
+    processed_sample_id %in% meta_processed$processed_sample_id
+  )
+## qPCR data
+qpcr <- here("data", "qpcr.rds") |>
+  read_rds() |>
+  rename(processed_sample_id = sample) |>
+  mutate(
+    target = fct_recode(target, "SARS-CoV-2" = "Cov2"),
+    target = fct_relevel(target, "SARS-CoV-2", "PMMoV"),
+  ) |>
+  filter(
+    # Only keep qPCR controls and target samples
+    task != "UNKNOWN" | processed_sample_id %in% meta_processed$processed_sample_id
+  )
+## Dates with MGS measurements
+mgs_dates <- c(
+  "2023-12-05",
+  "2023-12-08",
+  "2023-12-12",
+  "2023-12-15"
+) |> as.Date()
+## Dates where we processed samples with the PR protocol, by sample type
+tbl_dates <- meta_processed |>
+  summarize(.by = sample_source,
+    across(collection_date, list(first = min, last = max)),
+    n_dates = length(unique(collection_date)),
+    n_replicates = n()
+  ) |>
+  rename_with(\(x) str_replace(x, "collection_", ""))
+## Massachusetts COVID-19 reporting data (https://www.mass.gov/info-details/covid-19-reporting)
+covid_ma <- here("data-raw", "public", "archived-covid-19-dashboard-2023-2024.xlsx") |>
+  readxl::read_excel(
+    sheet = "County Data",
+    # col_types = c("text", "date", "date", "text", "numeric", "numeric",
+    #   "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
+    #   "numeric", "date"),
+    na = c("", "*")
+  ) |>
+  janitor::clean_names() |>
+  mutate(
+    across(c(population, cases_during_this_week, cumulative_confirmed_cases, contains("tests")), as.integer),
+    across(c(week_percent_positivity, starts_with("weekly_")), as.numeric),
+    across(c(ends_with("date"), last_updated), as.Date),
+  ) |>
+  rename(
+    cases = cases_during_this_week,
+    confirmed_cases_cumulative = cumulative_confirmed_cases,
+    tests_total_cumulative = cumulative_tests,
+    tests_total = tests_during_the_week,
+    tests_positive = positive_tests_the_week,
+  )
+```
+
+# Abstract
+
+Robust early warning of emerging viruses requires sampling populations that drive spread coupled with assays capable of detecting new viral variants or species.
+Untargeted viral metagenomic sequencing can, in principle, detect any virus, including completely novel ones.
+Composite airplane wastewater enables monitoring long-distance travelers from central collection points; however, the performance of untargeted viral metagenomic sequencing in this sample type remains unknown.
+In municipal wastewater, abundant sewer-associated microbes and ribosomal RNA depress viral relative abundance, limiting metagenomic sensitivity.
+We compared untargeted viral metagenomic sequencing of composite airplane wastewater with time-matched municipal wastewater from the Greater Boston area.
+Human viruses and other human-associated taxa had consistently higher relative abundance in airplane samples than municipal samples, while most sewer-associated taxa had lower relative abundance.
+An increased relative abundance of human viruses lowers the sequencing depth required to detect emerging pathogens, suggesting that metagenomic sequencing of composite airplane wastewater is a cost-effective method for pathogen-agnostic surveillance.
+
+# Importance
+
+Long-distance air travelers spread viral pathogens globally, making them an ideal sentinel population for pandemic surveillance systems.
+Testing composite airplane wastewater offers a practical, noninvasive approach to monitoring the traveler population.
+However, current surveillance systems rely on tests targeting specific known pathogens, missing novel threats.
+Untargeted metagenomic sequencing can detect viruses known or novel, but remains expensive to implement at scale; in municipal wastewater, sewer-derived microbes tend to overwhelm human viruses in sequencing data.
+We investigated whether a hypothesized reduced sewer microbial load in airplane wastewater would lower the sequencing effort required for viral detection.
+Understanding the performance of metagenomic sequencing in this context informs the design of cost-effective early-warning systems for emerging pandemics.
+
+# Introduction
+
+Long-distance air travelers are important vectors for the spread of emerging viral pathogens, making them a valuable sentinel population for pandemic early warning (@wegrzyn2023earl, @li2023glob, @bivins2024lava, @stonge2025pand).
+Wastewater from long-haul flights is a promising noninvasive sample stream for monitoring travelers; however, sampling individual planes is expensive and logistically challenging (@li2023glob, @bivins2024lava, @nasem2024incr, @stonge2025pand).
+A potential solution is composite sampling at airport triturators—devices that process airplane wastewater before it enters the sewer system (@nasem2024incr).
+Triturators allow automatable collection of composite wastewater from large numbers of arriving flights with minimal operational disruption (@nasem2024incr).
+The use of multi-flight composite samples loses flight-level information (such as country of origin) but reduces processing costs and privacy concerns.
+Triturator monitoring for select respiratory pathogens is now routinely used at several airports as part of the US Centers for Disease Control and Prevention (CDC)'s Traveler-based Genomic Surveillance (TGS) program (@friedman2025leve, @cdc2025trava).
+
+Extant wastewater monitoring primarily uses pathogen-specific molecular assays, such as quantitative polymerase chain reaction (qPCR) and amplicon sequencing.
+However, broad-spectrum methodologies based on untargeted or semi-targeted metagenomic sequencing (MGS) can also be used to detect a wide range of enteric and non-enteric viruses in wastewater (@rushford2025unta, @tisza2023wast).
+Semi-targeted MGS enriches for known viruses while tolerating some divergence, whereas untargeted MGS can theoretically detect entirely novel viruses.
+Such pathogen-agnostic capabilities are ideal for pandemic early warning.
+
+However, deployment of wastewater MGS faces concerns about cost (@nasem2024incr, @grimm2025infe).
+Studies of municipal wastewater suggest the primary challenge is the low relative abundance of human viruses compared to the background microbial community; this high off-target background necessitates costly deep sequencing to detect viruses, especially non-enteric ones (@critschristoph2021geno, @rothman2021rnav, @grimm2025infe, @rushford2025unta).
+Probe-capture panels reduce the required depth by reducing this background, but only partially (@kantor2024cons).
+A major background source is the sewer-system microbiome: Only 10–15% of microbial genetic material in treatment-plant influent is human-derived, with the remainder attributed to the sewer system itself (@vandewalle2012acin, @newton2015sewa, @mclellan2019unex, @fierer2022meta, @roguet2022guts).
+Reducing this sewer component could substantially increase the relative abundance of human viruses.
+
+Airplane wastewater, sampled closer to the point of excretion, likely contains fewer sewer-derived microbes than municipal wastewater.
+This reduction should lead to higher relative abundances of known and novel human viruses, reducing the sequencing depth needed for detection.
+However, the composition of airplane wastewater may be affected by other factors such as passenger lavatory habits (@jones2023suit), low temperatures (@bivins2024lava), elevated pH (@filho2017nutr, @hjelmso2019meta), and the presence of lavatory treatment fluid (@bivins2024lava).
+Only two studies have performed metagenomics on airplane wastewater (@nordahlpetersen2015meta, @hjelmso2019meta), neither using untargeted viral metagenomics.
+Further empirical study is needed to assess the performance of untargeted viral MGS of composite airplane wastewater and how it compares to the more widely studied municipal wastewater.
+
+We applied untargeted viral MGS to composite airplane wastewater and compared it to time-matched municipal wastewater from the same city.
+Over a two-month period, we collected composite samples from an airport triturator and a nearby municipal treatment plant, processed samples with a viral-enrichment protocol, and measured samples using targeted assays and deep untargeted MGS of extracted RNA.
+Human viruses and other human-associated taxa had much higher relative abundance in airplane than municipal samples, while sewer-associated taxa were typically less abundant.
+These findings suggest that untargeted viral MGS would require substantially less sequencing effort to detect emerging human viruses in composite airplane wastewater than predicted from municipal wastewater studies.
+
+# Results
+
+## Sample collection and measurement
+
+```{r}
+sampling_summary <- meta_processed |>
+  summarize(.by = c(sample_source, sample_type, collection_site),
+    first_date = min(collection_date),
+    last_date = max(collection_date),
+    total_dates = length(unique(collection_date)),
+    total_replicates = n(),
+  ) |>
+  arrange(sample_source)
+# check number of days of joint processing
+dates_joint <- meta_processed |>
+  summarize(.by = c(collection_site, collection_date),
+    total_replicates = n(),
+  ) |>
+  pivot_wider(names_from = collection_site, values_from = total_replicates) |>
+  filter(DITP > 0 & BOS > 0) |>
+  pull(collection_date)
+stopifnot(length(dates_joint) == 25)
+```
+
+We collected samples between late October and December 2023 from the airport and treatment plant serving Greater Boston, Massachusetts, United States. Boston Logan International Airport (BOS) is the busiest airport in the New England region.
+Deer Island Wastewater Treatment Plant (DITP) is among the largest treatment plants worldwide, serving a population of approximately 2.3 million people across 43 municipalities (@duest2023mode, @epa2023mwra).
+DITP's catchment is split into North and South subsystems; BOS airport, which is located less than 3 miles away from the treatment plant, is served by the North subsystem.
+Airplane (BOS) samples represent the population of air travelers passing through or arriving to Boston, while DITP samples represent the local population of workers and residents.
+Parallel collection across the two sites enables direct comparison of traveler and local populations during the same period.
+
+Routine collection of DITP samples began on October 31, 2023, with BOS sampling added on November 13, and continued through December 22.
+Sampling was performed on weekdays excluding holidays and unscheduled disruptions, resulting in 36 days of DITP data and 25 days of parallel BOS–DITP data (@fig-sampling, @tbl-sampling).
+BOS sampling was performed as part of the CDC's TGS program.
+24-hour composite samples of airplane wastewater were collected late morning.
+Each composite sample was collected via an autosampler from the inflow of a triturator which receives airplane wastewater from a large fraction of domestic and the majority of international arrivals.
+DITP sampling was performed mid-morning by treatment-plant staff, providing three distinct samples.
+Raw influent was collected separately from North and South sewer subsystems via autosampler as 24-hour composites.
+Primary sludge (settled solids) was collected from a combined (North and South) channel as a single grab sample.
+The two influent sources appear highly similar in our measurements; for simplicity, we group them together as "influent" unless otherwise specified.
+We refer to the three sample types as "airplane" (BOS triturator inflow), "sludge" (DITP combined sludge), and "influent" (DITP North and South influent).
+
+All samples were transported on ice and processed the same day through total nucleic-acid extraction using custom protocols designed to enrich for viruses over bacterial and human material.
+For each sample, we assayed total DNA and RNA concentrations and the concentrations of the viruses SARS-CoV-2 and pepper mild mottle virus (PMMoV).
+In addition, we performed a pilot round of untargeted viral MGS on samples from four dates in early-mid December (@fig-sampling, @tbl-mgs-dates).
+To further enrich for viruses, sequencing preparation included a step to remove bacterial ribosomal RNA (ribodepletion); to assess the efficiency of this step, we sequenced each sample with and without depletion.
+
+```{r}
+#| label: fig-sampling
+#| fig-cap: "**Sampling and processing schedule for a systematic comparison of metagenomic sequencing (MGS) of municipal and composite airplane wastewater.** Samples were collected and processed on most weekdays from October 31 through December 22, 2023. Each collection day, samples were processed through total nucleic-acid extraction in one or two replicates. Each sample was assayed for total DNA and RNA concentrations and the concentrations of SARS-CoV-2 and pepper mild mottle virus; samples from four dates (dashed grey vertical lines) were additionally measured by untargeted viral MGS."
+#| fig-asp: 0.35
+# breaks_dates <- range(c(tbl_dates$date_first, tbl_dates$date_last))
+breaks_dates <- c(
+  "2023-10-31",
+  "2023-11-13",
+  "2023-12-01",
+  "2023-12-22"
+) |> as.Date()
+meta_processed |>
+  filter(
+    sample_source != "NEG"
+  ) |>
+  count(collection_date, sample_source, sample_type, collection_site,
+    sample_source_plot, collection_site_plot
+  ) |>
+  ggplot(aes(
+    x = collection_date,
+    y = sample_source_plot,
+    color = sample_source,
+  )) +
+  facet_col(~collection_site_plot, scales = "free_y", space = "free") +
+  scale_x_date(breaks = breaks_dates, date_labels = "%b %d") +
+  scale_y_discrete(limits = rev) +
+  scale_color_manual(values = colors_oi) +
+  labs(x = 'Date', y = 'Sample source', color = 'Sample source') +
+  theme(legend.position = 'none') +
+  geom_vline(xintercept = mgs_dates, color = "grey80", linetype = "dashed") +
+  geom_point()
+```
+
+## Human viruses and other human-associated taxa have higher MGS relative abundance in airplane wastewater
+
+For metagenomics to function as a cost-effective early warning system, pathogen RNA must be present at sufficient concentrations to be detected at practical sequencing depths.
+We therefore focused our analysis of MGS data on relative abundance, defined as the number of reads obtained from the target taxon per total reads sequenced.
+This metric serves as a proxy for detection efficiency: Any increase in a pathogen's relative abundance yields a proportional reduction in the amount of sequencing required to detect it (@grimm2025infe).
+
+We compared viral relative abundances across sample types for 10 genera of human-infecting RNA viruses which were detectable in the four days of MGS data.
+These genera have diverse taxonomy and include viruses transmitted via respiratory and fecal-oral routes.
+Although highly variable, relative abundances across these diverse genera were consistently higher in airplane wastewater than in both municipal sample types (@fig-hv).
+Comparing municipal sample types, abundances were generally similar between influent and sludge, though _Betacoronavirus_ was higher in influent.
+
+```{r}
+#| label: fig-hv
+#| fig-cap: "**Across ten genera of human RNA viruses, viral relative abundances were typically greater in airplane than municipal wastewater.** Points represent individual samples from the four-day metagenomic-sequencing pilot. The x-axis (log scale) shows relative abundance, defined as the ratio of deduplicated reads assigned to the taxon divided by total reads sequenced in ribodepleted libraries."
+#| warning: false
+focal_hv_genera <- c(
+  "Mamastrovirus", "Enterovirus", "Kobuvirus", "Norovirus",
+  "Salivirus", "Sapovirus", "Rotavirus", "Alphacoronavirus",
+  "Betacoronavirus", "Alphainfluenzavirus"
+)
+# Get a dataframe with just the genus-level counts of the focal genera, for just the ribodepleted samples
+focal_hv_gen_df <- ps_hv |>
+  filter_sample_data(ribo_depleted) |>
+  filter_tax_table(
+    rank == "genus",
+    name %in% focal_hv_genera
+  ) |>
+  as_tibble() |>
+  mutate(
+    frac = .abundance / n_read_pairs_raw,
+    taxon_name_plot = name
+  )
+# Plot abundances for the focal genera
+focal_hv_gen_df |>
+  ggplot(aes(
+    x = frac,
+    y = taxon_name_plot,
+    color = sample_type,
+    shape = sample_type
+  )) +
+  cowplot::theme_minimal_hgrid() +
+  labs(
+    x = "Relative abundance",
+    y = "Genus",
+  ) +
+  scale_x_log10() +
+  colors_and_shapes_sample_type +
+  geom_point(
+    aes(group = sample_type),
+    position = ggstance::position_dodgev(height = 0.5),
+    alpha = 0.8
+  )
+```
+
+While higher prevalence in travelers might explain increases in relative abundance for specific viruses, the consistent elevation across 10 diverse genera suggests a systematic difference in sample composition.
+This observation supports our hypothesis that airplane wastewater contains significantly less material from the sewer microbiome, a reduction that would systematically inflate the relative abundance of human-derived taxa.
+
+To further test this mechanism, we examined the relative abundances of additional human-associated taxa (dietary plant viruses, gut bacteria, and bacteriophages) and sewer-associated bacteria ([Methods]).
+For bacteria, we excluded ribosomal reads from the target counts (the numerator) to avoid confounding by variable ribodepletion efficiency, while retaining total sequenced reads as the denominator to maintain comparability to changes in human viruses.
+Relative abundances of human-associated taxa were universally higher in airplane samples (@fig-ref). Conversely, 4 of 5 sewer-associated bacterial genera were lower in airplane samples, with only _Acinetobacter_ showing similar abundance across sample types.
+
+```{r}
+#| label: fig-ref
+#| fig-cap: "**The relative abundances of non-pathogenic human-associated taxa are higher in airplane than municipal wastewater, while most sewer-associated bacteria are lower.** Points represent individual samples from the four-day metagenomic-sequencing pilot. The x-axis (log scale) shows relative abundance, defined as the ratio of non-ribosomal reads assigned to the taxon divided by total reads sequenced. Ribosomal reads were excluded from the numerator to control for variable ribodepletion efficiency. Clipped points at the left edge indicate samples where there were zero assigned reads."
+#| warning: false
+
+ref_taxid_df <- tribble(
+  ~taxid, ~association,
+  # Human associated
+  "9606",    "human", # Homo sapiens
+  "12239",   "human", # Pepper mild mottle virus
+  "12242",   "human", # Tobacco mosaic virus
+  "12305",   "human", # Cucumber mosaic virus
+  "816",     "human", # Bacteroides
+  "2948652", "human", # Carjivirus - the crassphage genus
+  # Sewer associated
+  "469",     "sewer", # Acinetobacter
+  "642",     "sewer", # Aeromonas
+  "28196",   "sewer", # Arcobacter
+  "477666",  "sewer", # Bacteroides graminisolvens
+  "82802",   "sewer", # Trichococcus
+)
+
+# Prepare a dataframe with reference taxa abundances for plotting and model
+# fitting. Exclude ribosomal reads.
+ref_df <- ps_tax |>
+  filter_sample_data(ribo_depleted) |>
+  filter_tax_table(
+    taxid %in% ref_taxid_df$taxid,
+    ribosomal == "FALSE"
+  ) |>
+  as_tibble() |>
+  left_join(ref_taxid_df, by = "taxid") |>
+  mutate(
+    across(ribosomal, as.logical),
+    frac = .abundance / sample_sum,
+    taxon_name_plot = case_when(
+      !is.na(species) ~ species,
+      # genus == "Carjivirus" ~ "Carjivirus (CrAssphage)",
+      TRUE ~ genus
+    )
+  )
+
+ref_df |>
+  mutate(
+    domain_plot = case_when(
+      domain == "Bacteria" ~ str_glue("{domain} ({association}-associated)"),
+      TRUE ~ domain
+    ) |> fct_relevel("Viruses", "Eukaryota", "Bacteria (human-associated)")
+  ) |>
+  ggplot(aes(
+    x = frac,
+    y = taxon_name_plot,
+    color = sample_type,
+    shape = sample_type
+  )) +
+  cowplot::theme_minimal_hgrid() +
+  facet_col(~domain_plot, scales = "free_y", space = "free") +
+  labs(
+    x = "Relative abundance",
+    y = "Taxon",
+  ) +
+  scale_x_log10() +
+  colors_and_shapes_sample_type +
+  geom_point(
+    aes(group = sample_type),
+    position = ggstance::position_dodgev(height = 0.5),
+    alpha = 0.8
+  )
+```
+
+```{r nb-regression}
+# Use cached regression results if available
+if (file.exists("_output/nb-fits.rds")) {
+  nb_fits <- read_rds("_output/nb-fits.rds")
+} else {
+  # Prep data for running NB regressions on airplane-vs-influent only
+  nb_df <- bind_rows(.id = "taxon_type",
+    hv = focal_hv_gen_df,
+    ref = ref_df
+  ) |>
+    filter(sample_type != "sludge") |>
+    mutate(
+      seq_effort = case_when(
+        taxon_type == "hv" ~ n_read_pairs_raw,
+        taxon_type == "ref" ~ sample_sum,
+      ),
+      sample_type = fct_relevel(sample_type, "influent")
+    ) |>
+    mutate(.after = association,
+      taxon_type_detail = case_when(
+        taxon_type == "hv" ~ "Human virus",
+        association == "human" ~ "Human-associated taxon",
+        association == "sewer" ~ "Sewer-associated taxon",
+      ),
+    )
+  # Run regressions on each taxon individually
+  run_glm <- function(x) {
+    stan_glm(
+      .abundance ~ sample_type,
+      data = x |>
+        mutate(across(collection_date, as.factor)),
+      family = "neg_binomial_2",
+      offset = log(seq_effort),
+      iter = 4000,
+      refresh = 0
+    )
+  }
+  set.seed(123)
+  nb_fits <- nb_df |>
+    nest(
+      .by = c(taxon_type, association, taxon_type_detail,
+        .otu, taxon_name_plot, rank, domain:species)
+    ) |>
+    mutate(
+      fit = map(data, run_glm)
+    )
+  # Cache results
+  fs::dir_create("_output")
+  write_rds(nb_fits, "_output/nb-fits.rds")
+}
+nb_intervals <- nb_fits |>
+  select(-data) |>
+  mutate(
+    fit = map(fit, \(x) as_tibble(x) |> janitor::clean_names())
+  ) |>
+  unnest(fit) |>
+  rename(
+    triturator_vs_influent = sample_typeairplane
+  ) |>
+  pivot_longer(intercept:reciprocal_dispersion) |>
+  group_by(across(taxon_type:name)) |>
+  median_qi(value, .width = c(.5, .8, .95, .99))
+```
+
+```{r}
+# Median mean estimates for reporting
+nb_estimates <- nb_intervals |>
+  filter(
+    name == "triturator_vs_influent",
+    .width == 0.5 # Doesn't matter which interval we use
+  ) |>
+  mutate(
+    across(c(value, .lower, .upper), exp),
+  ) |>
+  select(taxon_type_detail, taxon_name_plot, value)
+nb_estimates_medians <- nb_estimates |>
+  summarize(.by = taxon_type_detail, across(value, median))
+```
+
+We quantified these differences using negative-binomial regression to estimate the fold-change in mean relative abundance between airplane wastewater and municipal influent (@fig-model-hv-and-ref, @tbl-model-estimates).
+Human viruses showed a 13-fold median increase in relative abundance in airplane wastewater (range: 5.5-fold for _Sapovirus_ to 120-fold for _Alphacoronavirus_).
+Other human-associated taxa showed a similar enrichment, with a 24-fold median increase (range: 4.6-fold for _Homo sapiens_ to 110-fold for PMMoV).
+In contrast, sewer-associated bacteria except _Acinetobacter_ showed decreases of a similar magnitude.
+
+
+```{r}
+#| label: fig-model-hv-and-ref
+#| fig-cap: "**The fold increase in average relative abundance in airplane wastewater versus municipal influent is greater than one for human viruses and human-associated taxa and less than one for 4 of 5 sewer-associated taxa.** Estimated fold increases are from Bayesian negative binomial regressions run individually for each taxon (4 airplane and 8 influent samples from 4 dates). The x-axis (log scale) shows posterior quantile intervals (50%, 80%, and 95% intervals)."
+#| fig-asp: .8
+nb_intervals |>
+  filter(
+    name == "triturator_vs_influent",
+    .width != .99
+  )|>
+  mutate(
+    taxon_name_plot = fct_reorder(taxon_name_plot, value),
+    # Put model coefficients on linear scale
+    across(c(value, .lower, .upper), exp)
+  ) |>
+  ggplot(aes(y = taxon_name_plot, x = value)) +
+  facet_col(~taxon_type_detail, scales = "free_y", space = "free") +
+  cowplot::theme_minimal_hgrid() +
+  scale_color_brewer() +
+  scale_x_log10(labels = as.numeric) +
+  labs(
+    x = "Estimated fold increase",
+    y = "Taxon (genus or species)",
+    color = "Interval"
+  ) +
+  geom_vline(xintercept = 1, color = 'grey', linetype = "dashed") +
+  geom_interval(aes(xmin = .lower, xmax = .upper))
+```
+
+These results suggest the presence of underlying differences in sample types that lead not just to increased relative abundance of human viruses, but also a wide range of human-derived taxa, and a similar scaled decrease for at least some sewer-derived microbes.
+
+## High-level taxonomic differences between airplane and municipal wastewater
+
+```{r}
+#| label: comp-calcs
+
+ps_tax_comp_df <- ps_tax |>
+  filter_sample_data(ribo_depleted == TRUE) |>
+  filter_tax_table(rank %in% c("unclassified", "domain")) |>
+  as_tibble() |>
+  mutate(.by = c(.sample),
+    frac = .abundance / sum(.abundance)
+  ) |>
+  mutate(
+    category = case_when(
+      ribosomal == TRUE ~ "Ribosomal",
+      rank == "unclassified" ~ "Unclassified",
+      TRUE ~ domain
+    )
+  ) |>
+  summarize(.by = c(.sample, category, provider:sample_source_plot),
+    across(frac, sum)
+  ) |>
+  mutate(
+    across(category, \(x) fct_relevel(x, "Ribosomal", "Unclassified"))
+  )
+
+tax_comp_by_source <- ps_tax_comp_df |>
+  summarize(.by = c(sample_source_plot, category), across(frac, mean))
+tax_comp_by_type <- ps_tax_comp_df |>
+  summarize(.by = c(sample_type, category), across(frac, mean))
+tax_comp_by_type_wide <- tax_comp_by_type |>
+  pivot_wider(names_from = sample_type, values_from = frac)
+tax_comp_mat <- tax_comp_by_type |>
+  pivot_wider(names_from = category, values_from = frac) |>
+  column_to_rownames("sample_type") |>
+  as("matrix")
+# Fold changes in airplane wastewater relative to the average of sludge + influent
+tax_comp_fc_influent <- tax_comp_by_type |>
+  pivot_wider(names_from = sample_type, values_from = frac) |>
+  mutate(airplane_fc = airplane / influent) |>
+  select(category, airplane_fc) |>
+  deframe() |>
+  signif(digits = 2)
+tax_comp_fc_municipal <- tax_comp_by_type |>
+  pivot_wider(names_from = sample_type, values_from = frac) |>
+  mutate(airplane_fc = airplane / ((sludge + influent) / 2)) |>
+  select(category, airplane_fc) |>
+  deframe() |>
+  signif(digits = 2)
+# Ribosomal fractions as percentages
+ribo_frac_perc <- tax_comp_mat[,"Ribosomal"] |>
+  map_chr(\(x) str_c(signif(x*100, digits = 2), "%"))
+```
+
+We next investigated whether differences in high-level taxonomic composition between sample types could further clarify the drivers of the increased relative abundance for particular human-associated taxa.
+
+We first examined taxonomic composition at the domain level, distinguishing between ribosomal and non-ribosomal reads (@fig-comp, @tbl-comp).
+The domain-level composition of the three municipal sources look similar to each other and stand in marked contrast with airplane samples.
+While municipal samples are dominated by ribosomal reads, averaging `r ribo_frac_perc["sludge"]` for sludge and `r ribo_frac_perc["influent"]` for influent, airplane samples average just `r ribo_frac_perc["airplane"]`---more than 5-fold lower.
+For all other categories, airplane wastewater shows higher fractions.
+Compared to influent, airplane wastewater shows moderately higher fractions of non-ribosomal bacterial and unclassified reads  (`r signif(tax_comp_fc_influent["Unclassified"], 2)`-fold higher) and substantially higher fractions of eukaryotic (`r signif(tax_comp_fc_influent["Eukaryota"], 2)`-fold higher) and viral (`r signif(tax_comp_fc_influent["Viruses"], 2)`-fold higher) reads.
+
+```{r}
+#| label: fig-comp
+#| fig-cap: "**Airplane wastewater contains a significantly lower fraction of ribosomal reads and higher fractions of viral and eukaryotic reads compared to municipal wastewater.** Domain-level taxonomic composition, estimated from a random subset of 1 million reads per sample using ribodepleted libraries, is shown for each sample grouped by sample source. The 'Ribosomal' category includes any reads identified as ribosomal regardless of taxonomic domain; all remaining categories only include non-ribosomal reads."
+ps_tax_comp_df |>
+  ggplot(aes(
+    x = factor(collection_date), y = frac,
+    fill = category
+  )) +
+  labs(
+    x = "Collection date",
+    fill = "Category",
+    y = "Fraction"
+  ) +
+  facet_row(~sample_source_plot) +
+  scale_fill_brewer(palette = "Set3") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
+  ) +
+  geom_col()
+```
+
+A decrease in ribosomal content could drive increases in other genomic features due to the sum-to-one constraint of fractional abundances (@gloor2017micr).
+Supposing rRNA were to be removed from influent samples to bring the average fraction down to that in airplane samples, the average fractions of other categories would increase by a factor of `r signif((1 - tax_comp_mat["airplane","Ribosomal"] ) / (1 - tax_comp_mat["influent","Ribosomal"]), 2)`.
+Therefore, variation in rRNA alone can potentially explain the full increase in non-ribosomal bacterial and unclassified reads, but only a small part of the increase in viruses overall or the increases in the relative abundances of human viruses and human-associated taxa seen in the previous section.
+
+We next considered the composition of bacteria at the class level (non-ribosomal reads only; @fig-comp-bac-class) and viruses at the family level (@fig-comp-vir-fam).
+Airplane and municipal wastewater show substantial overlap in the bacterial class composition, but with notable quantitative differences.
+In particular, airplane samples had larger fractions of _Clostridia_ and _Actinomycetes_ and smaller fractions of _Epsilonproteobacteria_, _Fusobacteriia_, and _Gammaproteobacteria_ compared to municipal samples.
+These classes each contain ecologically diverse lineages, making detailed interpretation difficult; however, these differences suggest distinct compositions of bacteria between airplane and municipal wastewater.
+
+Viral reads in all sample types are dominated by the family of plant viruses _Virgaviridae_; however, municipal samples also have large contributions from families in the class of RNA phages _Leviviricetes_ which are rare in airplane samples.
+Airplane wastewater, on the other hand, shows greater fractions of the families _Astroviridae_ and _Caliciviridae_, which contain human enteric viruses.
+These differences further support the idea that microbial RNA from airplane wastewater is primarily from direct human contributions, whereas that in municipal wastewater contains contributions from a distinct sewer environment.
+
+## Bacterial ribosomal depletion was more effective in airplane samples
+
+To clarify the cause of the lower levels of rRNA seen in airplane wastewater among ribodepleted samples, we compared the ratio of ribosomal to non-ribosomal reads in ribodepleted versus non-depleted samples.
+The ratio is moderately lower in airplane versus municipal wastewater in non-depleted libraries, but much lower in depleted libraries (@fig-ribodepletion), indicating that the efficiency of ribodepletion at removing rRNA relative to non-rRNA was greater in airplane samples.
+We estimate ribodepletion efficiency to be approximately 6-fold greater in airplane versus influent samples (@tbl-ribodepletion).
+[Appendix 2](#sec-ribodepletion) discusses possible causes for the lower baseline rRNA levels and improved ribodepletion efficiency seen in airplane wastewater.
+
+```{r}
+#| label: fig-ribodepletion
+#| fig-cap: "**Airplane samples have lower baseline levels of rRNA and greater efficiency of ribodepletion than in municipal samples.** Shown is the ratio of ribosomal to non-ribosomal reads (classified via k-mer matching to the SILVA database) for each sample (smaller semi-transparent points) along with their geometric means and 95% bootstrapped confidence intervals for each sample type and ribodepletion condition."
+#| fig-asp: 0.30
+
+# We'd like a table with the ribosomal and non-ribosomal read counts for each
+# sample, along with sample metadata. All reads should be covered by the
+# 'unclassified' and 'root' ranks, which will each be split across ribosomal
+# and non-ribosomal reads. So we can get what we want by filtering to these two
+# ranks, then summing across them for each rRNA class. We can achieve this
+# aggregation directly on the phyloseq object if we first relocate the
+# ribosomal column to the left of the rank column, which makes ribosomal status
+# appear like the higher-order taxonomic rank for the tax-glom function.
+ps_tax_rrna_df <- ps_tax |>
+  filter_tax_table(rank %in% c("unclassified", "root")) |>
+  relocate_tax_table(ribosomal) |>
+  tax_glom("ribosomal") |>
+  as_tibble() |>
+  mutate(.by = c(.sample),
+    frac = .abundance / sum(.abundance)
+  ) |>
+  mutate(
+    across(ribosomal, as.logical)
+  )
+
+# # check that sample_sum matches
+# ps_tax_rrna_df |>
+#   summarize(.by = c(.sample, sample_sum), across(.abundance, sum))
+
+ps_tax_rrna_df |>
+  filter(ribosomal) |>
+  ggplot(aes(
+    x = odds(frac), y = fct_rev(sample_type),
+    shape = ribo_depleted,
+    color = ribo_depleted
+  )) +
+  labs(
+    x = "ribosomal / non-ribosomal",
+    y = "Sample type",
+    color = "Ribo-depleted",
+    shape = "Ribo-depleted"
+  ) +
+  scale_color_brewer(type = "qual", palette = 6) +
+  expand_limits(x = c(0.03, 100)) +
+  scale_x_log10() +
+  # geom_point(alpha = 0.6)
+  stat_summary(fun.data = "mean_cl_boot") +
+  geom_quasirandom(width = 0.2, alpha = 0.6)
+```
+
+```{r}
+#| label: tbl-ribodepletion
+#| tbl-cap: "**The estimated efficiency of ribodepletion at removing ribosomal versus non-ribosomal reads, by sample type.** Estimates were obtained by linear regression on the log ratio of ribosomal to non-ribosomal reads, then exponentiating to convert back to the linear scale. Intervals are 95% parametric confidence intervals."
+
+# Estimate the relative fold change in rRNA (vs non-rRNA)
+rrna_fits <- ps_tax_rrna_df |>
+  filter(ribosomal) |>
+  nest(.by = sample_type) |>
+  mutate(
+    fit = map(data, \(x) lm(data = x, log(odds(frac)) ~ ribo_depleted)),
+    fit = map(fit, \(x) broom::tidy(x, conf.int = TRUE))
+  ) |>
+  select(-data) |>
+  unnest(fit) |>
+  filter(term == "ribo_depletedTRUE") |>
+  mutate(
+    across(c(estimate, conf.low, conf.high), exp)
+  )
+
+# Create a table, showing the results in terms of the reduction factor
+# (reciprocal of fold change).
+rrna_fits |>
+  select(sample_type, estimate, starts_with("conf.")) |>
+  mutate(
+    across(where(is.numeric), \(x) 1 / x),
+    across(where(is.numeric), \(x) signif(x, 2)),
+    interval = str_glue("({conf.low}, {conf.high})"),
+  ) |>
+  select(-starts_with("conf.")) |>
+  rename_with(\(x) janitor::make_clean_names(x, "sentence")) |>
+  gt() |>
+  cols_label(Interval = "95% interval") |>
+  fmt_number(n_sigfig = 2) |>
+  gt_base_styling()
+```
+
+## Non-sequencing measurements suggest human-associated viruses form a higher fraction of total RNA in airplane wastewater
+
+Our non-sequencing measurements provide an orthogonal view of relative abundances for SARS-CoV-2 and PMMoV over the full experimental time course.
+We estimated concentrations of both RNA viruses via reverse transcription quantitative PCR (RT-qPCR) and the concentration of total RNA via Qubit florescence assay.
+We then computed the ratio of viral concentration to total RNA concentration for each virus.
+This ratio estimates the virus' relative abundance as a fraction of total extracted RNA; variation in the ratio among samples is therefore predictive of variation in MGS relative abundances ([Methods]).
+
+```{r}
+#| label: fig-qc-ratio-traj
+#| fig-cap: "**Estimated abundances of SARS-CoV-2 and PMMoV RNA relative to total RNA were consistently higher in airplane than municipal wastewater.** The y-axis shows the estimated relative values among samples in the ratio of viral genome copies (measured by RT-qPCR) to total RNA (measured by Qubit). Qubit measurements for samples before and after December 4 are incomparable due to an experimental batch effect ([Methods]). Only the relative differences between samples for a given virus and Qubit batch are meaningful; ratios are scaled so that median value within a panel is 1. Vertical dashed lines indicate the four dates selected for metagenomic sequencing."
+#| fig-width: 9
+# For qPCR results, average over the available Cq measurements for each sample,
+# dropping samples with less than 3 replicates.
+qpcr_mean <- qpcr |>
+  filter(cq_status == "Determined") |>
+  summarize(.by = c(processed_sample_id, target),
+    across(cq, mean),
+    n = n()
+  ) |>
+  filter(n >= 3)
+# Let's get a simpler dataframe of Qubit RNA results for joining with qPCR
+# results, based on processed sample ID. There is only one Qubit RNA
+# measurement per processed sample ID.
+qubit_rna <- qubit |>
+  filter(na_type == "RNA") |>
+  select(processed_sample_id, measurement_year, starts_with("conc_sample"), range_status)
+# Note, ratios are scaled separately within measurement batches
+qpcr_fig <- qpcr_mean |>
+  left_join(qubit_rna, by = "processed_sample_id") |>
+  left_join(meta_processed, by = "processed_sample_id") |>
+  filter(sample_source != "NEG", !is.na(measurement_year)) |>
+  mutate(.by = c(target, measurement_year),
+    ratio = 2^(-cq) / conc_sample_oor,
+    ratio_scaled = ratio / median(ratio),
+    batch = fct_recode(measurement_year, "Batch 1" = "2023", "Batch 2" = "2024")
+  )
+# for plotting MGS dates in appropriate panels, need a df with batch and target
+mgs_dates_tbl <- tibble(
+  collection_date = mgs_dates,
+  batch = "Batch 2",
+) |>
+  crossing(target = c("SARS-CoV-2", "PMMoV"))
+
+qpcr_fig |>
+  mutate(
+    panel_label = fct_relabel(target, \(x) str_c(x, ":Total RNA")),
+  ) |>
+  ggplot(
+    aes(x = collection_date, y = ratio_scaled,
+    color = sample_type,
+    shape = sample_type
+  )) +
+  theme(
+    panel.spacing.x = unit(5, "mm"),
+  ) +
+  labs(
+    x = "Collection date",
+    y = "Ratio (scaled)",
+  ) +
+  facet_grid(target ~ batch, scales = "free_x", space = "free_x") +
+  scale_y_log10() +
+  colors_and_shapes_sample_type +
+  # Options for showing linear trends:
+  # stat_smooth(data = \(x) filter(x, sample_type == "influent"), method = "lm", size = 0.7, alpha = 0.2) +
+  # stat_smooth(aes(fill = sample_type), method = "lm", size = 0.7, alpha = 0.2) +
+  # fill_sample_type +
+  geom_vline(data = mgs_dates_tbl,
+    aes(xintercept = collection_date),
+    color = "lightgrey", alpha = 0.5, linetype = "dashed"
+    ) +
+  geom_point(size = 2, alpha = 0.6)
+```
+
+The ratio of viral-to-total RNA concentration for both SARS-CoV-2 and PMMoV is consistently higher in airplane wastewater than in both municipal sample types (@fig-qc-ratio-traj).
+For SARS-CoV-2, the ratio is also consistently higher in influent than in sludge.
+These observations are consistent with the patterns seen in MGS relative abundances for the 4-day subset (@fig-hv, @fig-ref).
+
+## Targeted measurements show distinct SARS-CoV-2 dynamics in airplane versus municipal wastewater
+
+```{r}
+#| label: prepare-fig-covid-tests
+covid_tricounty <- covid_ma |>
+  filter(county %in% c("Suffolk", "Norfolk", "Middlesex")) |>
+  summarize(.by = c(ends_with("_date")),
+    across(c(population, cases, tests_positive, tests_total), sum),
+  ) |>
+  mutate(
+    week_mid_date = week_end_date - days(3)
+  )
+
+# First and last sample collection dates
+collection_date_first <- tbl_dates |> pull(date_first) |> min()
+collection_date_last <- tbl_dates |> pull(date_last) |> max()
+# Use data from weeks from after the first wastewater sample collection until
+# right after the last sample collection. To have matching plot limits for the
+# qPCR plot (which plots by collection date), set limits to the range of the
+# set of collection dates and these testing dates.
+plt_tests_dates <- covid_tricounty |>
+  pull(week_end_date) |>
+  keep(\(x) between(x, collection_date_first, collection_date_last + 7))
+plt_tests_lims <- c(
+  plt_tests_dates,
+  collection_date_first,
+  collection_date_last
+) |> range()
+
+# # Check how much the tests increase over this period
+# covid_tricounty |>
+#   filter(between(week_end_date, collection_date_first - 7, collection_date_last + 7)) |>
+#   select(week_end_date, tests_positive)
+# # A tibble: 9 × 2
+#   week_end_date tests_positive
+#   <date>                 <int>
+# 1 2023-10-28               825
+# 2 2023-11-04               736
+# 3 2023-11-11               728
+# 4 2023-11-18               863
+# 5 2023-11-25               899
+# 6 2023-12-02              1374
+# 7 2023-12-09              1567
+# 8 2023-12-16              2023
+# 9 2023-12-23              2284
+
+plt_tests <- covid_tricounty |>
+  mutate(
+    panel_label = "Positive COVID tests in DITP catchment counties",
+  ) |>
+  filter(week_end_date %in% plt_tests_dates) |>
+  ggplot(aes(week_end_date, tests_positive)) +
+  facet_wrap(~panel_label) +
+  expand_limits(y = 0) +
+  facet_wrap(~panel_label) +
+  labs(x = "End of week", y = "Weekly positive tests") +
+  geom_line()
+```
+
+```{r}
+#| label: prepare-fig-qpcr-sars2-vs-pmmov-traj
+targets <- c("PMMoV", "SARS-CoV-2")
+qpcr_delta <- qpcr |>
+  left_join(meta_processed, by = "processed_sample_id") |>
+  filter(
+    collection_date < as.Date("2024-01-01"),
+    collection_date >= as.Date("2023-10-31"),
+    cq_status == "Determined",
+    sample_source != "NEG",
+  ) |>
+  # Remove sample + target pairs where we don't have valid triplicates
+  mutate(.by = c(processed_sample_id, target), n = n()) |>
+  filter(n >= 3) |>
+  # Remove samples where we don't have both SARS2 and PMMoV measurements
+  mutate(.by = processed_sample_id,
+    both_targets = all(targets %in% target)
+  ) |>
+  filter(both_targets) |>
+  # Nest the qPCR per-well columns; preserve sample-level metadata
+  nest(.by = !c(file, well:cq_status, n, both_targets)) |>
+  mutate(
+    # Estimate ΔCq for each sample
+    fit = map(data,
+      \(x) lm(data = x, cq ~ target) |> broom::tidy(conf.int = TRUE)
+    )
+  ) |>
+  select(-data) |>
+  unnest(fit) |>
+  filter(str_detect(term, "target"))
+# Plot
+plt_qpcr <- qpcr_delta |>
+  mutate(
+    panel_label = "PMMoV-normalized SARS-CoV-2 concentration in wastewater",
+    ratio = 2^estimate,
+    ratio_scaled = ratio / median(ratio),
+  ) |>
+  ggplot(aes(
+    collection_date,
+    ratio_scaled,
+    ymax = ratio_scaled * 2^std.error,
+    ymin = ratio_scaled / 2^std.error,
+    color = sample_type,
+    shape = sample_type
+  )) +
+  facet_wrap(~panel_label) +
+  scale_y_log10() +
+  colors_and_shapes_sample_type +
+  labs(y = "Ratio (scaled)", x = "Collection date") +
+  geom_pointrange(alpha = 0.6)
+```
+
+Our larger time-series of targeted measurements allows us to examine trends in
+SARS-CoV-2 infection dynamics which could impact how SARS-CoV-2 MGS relative abundance varies between sample types.
+To infer SARS-CoV-2 dynamics, we computed PMMoV-normalized SARS-CoV-2 concentrations from RT-qPCR measurements and compared them to positive test rates reported by the state of Massachusetts (@fig-qpcr-sars2-vs-pmmov-traj).
+Normalization to PMMoV accounts for variation in viral recovery and the amount of fecal input to the sample, improving the ability to infer trends from RT-qPCR measurements (@wolfe2021high).
+We note, however, that differences in normalized concentration between sample types are likely to reflect factors other than variation in SARS-CoV-2 infection rate.
+For example, normalized concentrations are consistently higher in influent than in sludge, consistent with previous findings that PMMoV partitions more strongly than SARS-CoV-2 to the solid versus liquid wastewater fraction (@kim2022sars, @barber2025oper).
+Therefore our data do not allow us to infer differences in infection rates between traveler and local populations, only differences in their trends.
+
+```{r}
+#| label: fig-qpcr-sars2-vs-pmmov-traj
+#| fig-cap: "**RT-qPCR measurements of SARS-CoV-2 normalized to PMMoV track reported COVID-19 infection trends for Greater Boston in municipal---but not airplane---wastewater.** Panel A shows the ratio of SARS-CoV-2 to PMMoV (genome copies) estimated by RT-qPCR on collected wastewater samples. Only the relative differences between samples are meaningful; we therefore scale the ratios so that the median is 1. Panel B shows the number of positive COVID-19 tests from the past week reported by the Massachusetts Department of Public Health for the three counties (Suffolk, Norfolk, Middlesex) overlapping the treatment plant catchment. Vertical dashed lines indicate the four dates selected for metagenomic sequencing."
+#| fig-asp: 1
+plt_qpcr / plt_tests +
+  plot_annotation(tag_levels = "A") &
+  scale_x_date(limits = plt_tests_lims) &
+  geom_vline(xintercept = mgs_dates, color = "lightgrey", alpha = 0.5, linetype = "dashed")
+```
+
+The PMMoV-normalized SARS-CoV-2 concentration in municipal influent and sludge steadily increased over the sampling period by over 10 fold (Panel A), while the weekly number of positive SARS-CoV-2 tests within the DITP catchment area increased by over 3 fold (Panel B).
+The normalized concentration seen in airplane wastewater (Panel A) is highly variable, but has a more stable average.
+These data suggests that the infection rate among travelers was roughly constant, but with high variance day-to-day, while the infection rate in the municipal population increased over the study period.
+Notably, normalized SARS-CoV-2 concentration in municipal, but not airplane, wastewater is higher on the pilot MGS dates than in early November.
+This observation suggests that the difference in _Betacoronavirus_ relative abundances between airplane and municipal samples would have been greater for samples collected during this earlier period.
+
+::: {.content-visible when-format="pdf"}
+\clearpage
+:::
+
+# Discussion
+
+For the airport and treatment plant studied, relative abundance of human viruses in untargeted viral MGS data from composite airplane wastewater exceeded that in municipal wastewater by 5.5- to 120-fold (median 13-fold) across 10 diverse genera.
+Comparable increases occurred in non-ribosomal relative abundances for 7 other human-associated taxa, with decreases of a similar magnitude in 4 of 5 sewer-associated bacteria.
+While higher infection rates among travelers might explain increases in individual viruses, the consistent pattern across taxa suggests a systematic difference between sample types which elevates the relative abundance of human-associated taxa.
+We therefore predict that similar increases would apply for a novel, emerging virus.
+
+These patterns can be largely explained by a lower concentrations of sewer-derived microbes.
+Previous estimates that 10-15% of microbial DNA in treatment-plant influent is human-derived (@vandewalle2012acin, @newton2015sewa, @mclellan2019unex, @fierer2022meta, @roguet2022guts) suggest that eliminating the non-human component would increase relative abundances of human-derived taxa 6- to 10-fold.
+The effect could be larger for RNA, for example if metabolic activity is higher in sewer- than human-derived microbes.
+
+The underlying mechanism may, however, be more complex.
+The reduced rRNA fraction in airplane samples was partly due to more efficient ribodepletion, potentially contributing a ~2-fold increase in viral relative abundance.
+This efficiency difference could be explained by reduced RNA input in airplane samples or depletion probes having poorer coverage of sewer- than human-derived bacteria ([Appendix 2](#sec-ribodepletion)).
+Before ribodepletion, airplane samples had much lower RNA concentrations (but not DNA) than municipal samples (@fig-qubit), suggesting selective RNA degradation.
+Since filtration removes intact cells, leaving primarily extracellular bacterial RNA, higher pH in airplane wastewater (@filho2017nutr, @hjelmso2019meta) might selectively degrade cell-free bacterial RNA while preserving encapsulated viral RNA.
+Yet, this does not explain the 22-fold increase in the human-associated genus _Bacteroides_.
+Clarifying the mechanism could suggest future protocol improvements.
+
+While human viruses consistently had higher relative abundance in airplane samples, the magnitude of the increase varied.
+Larger increases seen in some viruses (_Alphacoronavirus_, _Enterovirus_, and to a lesser degree _Salivirus_) could be explained by them having a greater difference between traveler and community infection rates.
+Our targeted SARS-CoV-2 measurements suggest that infection dynamics do in fact differ between these populations.
+However, we lack the necessary infection-rate information required to test this potential explanation.
+The heterogeneity we observed could alternatively be explained by differences is wastewater biochemistry (for example, how airplane lavatory treatment fluid interacts with viral particles) or bathroom behavior (for example, the relative mix of bodily fluids).
+
+## Implications for the cost of MGS monitoring
+
+Detecting a pathogen via MGS requires sequencing a sufficient number of pathogen reads across one or more samples.
+Following the model of @grimm2025infe, the expected number of pathogen reads for a given wastewater sample equals the total number of sequencing reads multiplied by the pathogen's relative abundance.
+The relative abundance in turn is given by the pathogen's rate of infection in the sampled population multiplied by a conversion factor specific to that pathogen, sample source, and MGS protocol.
+These conversion factors were previously measured by @grimm2025infe for several viruses across studies which applied untargeted viral MGS to influent sampled from wastewater treatment plants.
+For example, they found that the average conversion factor across three studies for SARS-CoV-2, converting from weekly incidence (fraction of the population infected over the previous week) to relative abundance, was approximately $2 \times 10^{-6}$.
+A pathogen whose genome sequence is known (such as SARS-CoV-2 by mid-January 2020) can be detected with as few as 3 reads by aligning reads to the genome (@devries2021reco).
+For a hypothetical weekly incidence of $10^{-3}$ (1 in 1000), this estimate implies that `r (3 / (1e-3 * 2e-6)) / 1e9` billion total reads are typically needed to see 3 SARS-CoV-2 reads.
+
+Our results lower expectations for the sequencing depth required for effective MGS early-warning systems using airplane wastewater.
+Without infection data, we cannot estimate conversion factors like @grimm2025infe.
+However, the higher relative abundances we observe across viruses provides strong evidence that conversion factors are typically higher in airplane than municipal samples for these sites and MGS protocols.
+Assuming the observed median 13-fold increase applies, the required sequencing for 3 SARS-CoV-2 reads drops from `r (3 / (1e-3 * 2e-6)) / 1e9` billion to `r signif((3 / (1e-3 * 2e-6 * 13)) / 1e6, 2)` million, significantly lowering sequencing costs, sample preparation needs, and computational burden.
+Importantly, larger conversion factors provide a cost and/or sensitivity benefit for MGS-based early warning that is independent of (and compounds with) any advantage in the form of higher infection rates among travelers which may be expected during the early stages of a pandemic.
+
+Importantly, this analysis ignores the randomness inherent in pathogen detection.
+Airplane wastewater pools waste from fewer individuals than treatment plants, increasing the risk of missing pathogens if no infected individuals contribute to the sample.
+The higher day-to-day variance in airplane viral abundances we observed likely reflects these lower contributor numbers at least in part (with the changing daily flight mix also likely responsible).
+Ensuring sufficient aggregate passenger numbers across samples can mitigate increased sampling variation to fully leverage higher conversion factors.
+
+## Limitations and next steps
+
+This study was limited to one airport and one treatment plant over two months, with MGS on four dates.
+Multi-site, multi-season MGS studies are required to confirm generalizability.
+Future work should also assess how increased relative abundances translate to improvements in detection capability.
+Incorporating estimates of infection rates in the sampled traveler populations would enable model-based prediction of detection performance for hypothetical outbreak scenarios (as done in @grimm2025infe for municipal MGS).
+
+Protocol optimizations to reduce the ratio of off-target RNA may reduce the gap we observe between sample sources.
+Improvement in the removal of intact bacterial cells, the digestion of unencapsulated RNA, or ribodepletion efficiency could reduce bacterial RNA concentrations.
+Such improvements may especially improve viral relative abundances in municipal samples, where the concentration of bacterial RNA is greater.
+Alternatively (or in addition), pan-viral probe-capture panels can be used to enrich viruses with sufficient sequence similarity to known human viruses prior to sequencing (@tisza2023wast, @kantor2024cons, @mechikoff2025appl, @grimm2025infe).
+Prove-based enrichment is imperfect and tends to have a multiplicative effect on viral relative abundances (@kantor2024cons); thus, we expect airplane wastewater would retain its relative abundance advantage, but the magnitude and/or practical consequences of the difference may be reduced.
+Alternatively, municipal MGS monitoring could specifically target sites with naturally lower relative concentrations of sewer-derived microbes.
+Yet a third approach would be to look for municipal sampling locations that naturally have a higher ratio of human- to sewer-derived microbes.
+
+Compared to airplane wastewater, municipal wastewater provides greater population coverage and a more direct measure of what is happening in the local community.
+Therefore, MGS of airplane wastewater is a complement, not a replacement, of existing municipal wastewater monitoring programs.
+Targeted and semi-targeted methods can help overcome the low relative abundance of pathogens in municipal wastewater (at the cost of being pathogen agnostic).
+Future work should explore how to most effectively combine these two approaches.
+
+## Conclusion
+
+Composite sampling of airplane wastewater enables detecting the spread of pathogens across state and national borders as well as tracking global trends from a small number of sampling points.
+Our results suggest that untargeted MGS of airplane waste for pathogen-agnostic viral detection is more cost effective than expected from prior studies of municipal wastewater.
+Future work should evaluate the cost required for optimal deployment of composite airplane MGS to provide early warning for emerging viral pandemics.
+
+# Methods {#sec-methods}
+
+## Sample collection
+
+An overview of sample types and sampling locations and timeline are given in [Results] section "Sample collection and measurement"; here we provide further details.
+
+*Composite airplane wastewater from BOS airport:*
+Composite airplane wastewater was collected from Boston Logan International Airport (BOS) as part of the US Centers for Disease Control and Prevention (CDC)'s Traveler-based Genomic Surveillance Program (@friedman2025leve).
+An ISCO autosampler was positioned at the inlet of a triturator that receives waste from most international arrivals and a large share of domestic arrivals.
+Lavatory collection trucks routinely dispose of waste collected from one or more flights into the triturator to be broken down on its way into the sewer system.
+During each disposal event, the autosampler collected 50 mL every 2 min, collecting between 100-250 mL each time a truck was emptied, generating a 24-hour composite.
+During daily sample retrieval, the composite waste container was inverted to homogenize the contents, then poured through a funnel into collection bottles.
+Wastewater was collected by designated personnel at each location, transported and stored at 4 °C, and processed within 6 hours of collection.
+
+*Municipal wastewater from DITP:*
+Deer Island Wastewater Treatment Plant (DITP) serves approximately 2.3 million people across 43 municipalities (@duest2023mode, @epa2023mwra).
+The system feeding into DITP is a predominantly sanitary sewer system, with \~5% being combined (waste- and stormwater) sewers.
+It is divided into North and South subsystems, with the North System receiving a larger daily flow (around 214 versus 114 million gallons per day).
+(BOS airport is served by the North system.)
+
+We obtained three sample types: (i) 24-hour composites of raw influent from the North system, (ii) 24-hour composites of raw influent from the South system, and (iii) grab samples of primary sludge from a combined clarifier channel.
+North influent composites were typically pooled from East and West channel composites; on two dates, only one channel was available (East on 2023-11-27, West on 2023-12-21).
+South influent composites were collected from a single degritted channel; a South sample could not be collected on 2023-12-06.
+All municipal samples were prepared by treatment-plant staff in early-mid morning, delivered on wet ice the same morning, refrigerated on arrival, and processed within several hours of receipt.
+
+## Sample processing
+
+We processed samples with custom protocols designed with the joint aims of 1) enriching for viruses over bacterial and human cells and 2) treating each sample type similarly while also making type-specific adjustments to account for differences in concentration and consistency.
+
+*Particle removal and viral enrichment:*
+Our protocols for each sample type involved treating samples with a detergent (Tween 20) to dissociate viruses from other particles, followed by a centrifugation (municipal samples only) and filtration to remove cells and other material larger than human viruses.
+For municipal influent samples, we treated 200 mL of influent by adding 10% Tween 20 to a final concentration of 0.1%, followed by vortexing at 1,000 rpm for 1 min, then sonicating at 40 kHz for 1 min. We then centrifuged the influent at 10,000g for 5 min to pellet large particles, and filtered the supernatant with a 0.45 μm PES vacuum filter to remove remaining cells and larger solids.
+
+Municipal sludge (DCS) samples were more concentrated than influent, being visibly less dilute and yield more total DNA and RNA (measured by Qubit as described below) than influent for a given amount of sample input volume. Therefore, we modified our influent protocol to use less input volume and a higher concentration of Tween 20. We diluted 20 mL of sludge with 20 mL phosphate-buffered saline (PBS) and increased the final concentration of Tween 20 to 0.5%, and then followed the vortexing, sonicating, centrifuging, and filtering protocol as described for influent samples.
+
+Airplane wastewater was also more concentrated than influent; moreover, it had greater solid material (including paper debris) that led to clogging during vacuum filtration. For these samples, we diluted 40 mL of waste with 40 mL of PBS, brought the sample to a final concentration of Tween 20 to 0.5%, vortexed at full speed for 2 min, and sonicated as described for influent samples. In place of centrifuging, we added a 2 μm glass microfiber pre-filter to the surface of the 0.45 μm vacuum filter to remove large solids and other debris.
+
+*Concentration and extraction:*
+For all sample types, we concentrated the viral-enrichment filtrate using the InnovaPrep Concentrating Pipette Select and revision E of the manufacturer recommended parameters for wastewater concentration using Ultrafiltration Concentrating Pipette Tips. We immediately added DNA/RNA Shield to the concentrated sample and incubated at room temperature for 30 min to prevent sample degradation by RNases and inactivate any viral particles. We extracted mixed nucleic acids from the total concentrated sample volume using the Zymo Quick-DNA/RNA Viral Kit, with reagent volumes scaled to maintain the reagent-to-sample ratios recommended by the manufacturer. Nucleic acids were eluted from the spin column using 50 μL nuclease-free water and were divided into three aliquots and stored at -80C.
+
+Airplane wastewater yields more DNA but less RNA per unit volume than both influent and sludge. See @fig-qubit for DNA and RNA concentration measurements of samples processed with the final protocols.
+
+*Replicates and negative controls:*
+We processed samples in duplicate when sample delivery time and lab schedule allowed (every processing date for airplane samples and roughly half of processing dates for municipal samples). Separate negative controls (PBS) were processed in parallel for each sample type during processing and viral enrichment, and were combined into a single daily negative control prior to nucleic acid extraction.
+
+*Sample handlers:*
+Sample processing duties were split between two sample handlers (which we refer to as Handler A and Handler B), with a single handler responsible for receiving and processing the samples on any given day.
+Assignments were staggered across weekdays to avoid conflation of day-of-the-week and batch effects.
+
+*Detailed protocols:*
+We provide detailed protocols on Protocols.io for each sample type: influent (@machtinger2025conc), sludge (@machtinger2024conca), and composite airplane wastewater (@machtinger2024conc).
+
+## Total and targeted nucleic-acid measurements
+
+We performed total and targeted nucleic-acid measurements on at least one replicate for each sample type and date; these measurements provided quality control during the experiment and later served as independent measurements to compare to MGS data.
+Our total nucleic-acid measurements consisted of fluorescence-based (Qubit) assays of dsDNA and RNA concentrations.
+Our targeted measurements consisted of reverse transcription quantitative PCR (RT-qPCR) for SARS-CoV-2 and pepper mild mottle virus (PMMoV).
+The respiratory pathogen SARS-CoV-2 is readily quantifiable in wastewater via RT-qPCR (@duvallet2022nati) and can be compared to local public health reporting.
+The plant virus PMMoV is heavily consumed by people through plant-derived food products and shed into wastewater, leading to frequent use as a marker of human fecal contamination and a quantitative measurement of human fecal contribution to wastewater samples (@symonds2018pepp, @arts2023long, @maal-bared2023does).
+
+*Qubit:*
+We determined the DNA and RNA concentrations for each sample type using the Qubit HS dsDNA assay and Qubit HS RNA assay, respectively. From 2023-10-31 to 2023-12-01, we performed Qubit assays using 2 μL of undiluted sample from each replicate immediately after nucleic acid extraction. (We did not obtain dsDNA measurements on 2023-10-31.) After 2023-12-01, all Qubit measurements were performed weekly, using only one replicate per sample type per day. For these measurements, we made a 1:5 dilution of each nucleic acid sample, and used 2 μL for each assay. These different procedures resulted in a strong batch effect in which later measurements gave higher estimated concentrations for all sample sources even after adjusting for volume differences (@fig-qubit). The remaining volume of the diluted samples was used for the RT-qPCR assays described below.
+
+We estimated total DNA and RNA concentrations (in ng/μL) by adjusting the measurement from the Qubit instrument for the dilution used. Out-of-range measurements were set to the manufacturer's reported detection limit for the given assay volume and likewise adjusted for dilution.
+
+*RT-qPCR:*
+We used one-step RT-qPCR to measure the N2 region of SARS-CoV-2 using the CDC RUO primer and probe kit (REF, CDC 2020). The 20 μL reaction contained the following components: 5 μL TaqMan™ Fast Virus 1-Step Master Mix for qPCR (ThermoFisher cat: 4444434), 1.5 μL of N2 assay in the SARS-CoV-2 Research Use Only qPCR Primer & Probe Kit (IDT, 10006713), 8.5 μL RNase-free H2O, and 5 μL of a 1:5 dilution of the extracted nucleic acid as the template RNA. We prepared a five-point standard curve using a quantitative SARS-CoV-2 RNA standard (VR-3276SD, ATCC), ranging from 1E0 to 1E4 copies per reaction. At least two no-template control reactions were run on each plate, and all sample and standard-curve reactions were prepared in triplicate.
+
+We also measured PMMoV with RT-qPCR for use as an indicator of human fecal input and to demonstrate the effect on our protocol on viruses other than SARS-CoV-2. The 20 μL one-step RT-qPCR reaction contained the following components: 5 μL TaqMan™ Fast Virus 1-Step Master Mix for qPCR (ThermoFisher cat: 4444434), 0.3 μL of the forward primer (GAG TGG TTT GAC CTT AAC GTT GA, 10 uM), 0.3 μL of the reverse primer (TTG TCG GTT GCA ATG CAA GT, 10 uM), 0.2 uM of the probe (6-VIC-CCT ACC GAA GCA AAT G-MGB, 10 uM), 12.2 μL of RNase-free H2O,  and 2 μL of a 1:5 dilution of the extracted nucleic acid as the template RNA. A standard curve was prepared with a quantitative PMMoV RNA standard (AM2070, Promega), ranging from 8E1 to 8E5 copies per reaction. At least two no-template control reactions were run on each plate, and all sample and standard curve reactions were prepared in triplicate.
+
+```{r}
+#| label: tbl-qpcr
+#| tbl-cap: "**Conditions for RT-qPCR reactions.**"
+tribble(
+  ~Step,                    ~`Temp (C)`,  ~Time,    ~Cycle,
+  "Reverse transcription",     50,        "5 min",  "1x",
+  "RT deactivation",           95,        "20 sec", "1x",
+  "Denature",                  95,        "3 sec",  "40x",
+  "Anneal/Image (SARS-CoV-2)", 58,        "30 sec", "—",
+  "Anneal/Image (PMMoV)",      60,        "30 sec", "—",
+) |>
+  gt() |>
+  gt_base_styling()
+```
+
+```{r, eval = F}
+# Checking numbers of valid technical replicates
+qpcr_n <- qpcr |>
+  filter(task == "UNKNOWN", cq_status == "Determined") |>
+  count(processed_sample_id, target) |>
+  left_join(meta_processed, by = "processed_sample_id")
+qpcr_n |>
+  count(target, sample_type, n)
+qpcr_n |>
+  count(target, sample_type, n >= 3)
+qpcr_n |>
+  filter(n > 3)
+```
+
+For each virus and sample, we averaged the quantification cycle, or $C_q$ value, across the three technical replicates.
+For PMMoV, one sample of each sample type was excluded for having only two valid replicates.
+We used standard curve reactions to qualitatively assess the validity of qPCR measurements, but did not perform a standard curve calibration.
+Instead, we estimate the viral concentration relative to a fixed, arbitrary baseline as $2^{-C_q}$, effectively assuming perfect qPCR efficiency.
+For this reason, our analysis is only semi-quantitative and only relative differences between samples for a given virus are interpretable.
+
+_Estimating relative abundances from RT-qPCR and Qubit measurements_:
+To assess how the ratio of target viruses to total RNA varied among samples (@fig-qc-ratio-traj, we divide the value $2^{-C_q}$ from RT-qPCR viral concentration estimates by the total RNA concentration (in ng/μL) measured by Qubit. Only relative differences between samples for a given virus and Qubit batch are interpretable. To facilitate visualization, we scale ratios by dividing by the median value for the given virus and Qubit batch.
+
+Assuming that the ratio of the RT-qPCR target gene to all RNA from the virus is constant, then variation in this ratio among samples is expected to reflect variation in the fraction of total RNA that is derived from the given virus.
+Thus it is also expected to reflect variation in viral relative abundance we expect in our MGS data.
+However, we note some caveats.
+First, our RT-qPCR and Qubit measurements were performed on nucleic-acid extractions which were not subjected to the ribodepletion treatment performed during MGS preparation.
+Second, these measurements are not subject to the sequence deduplication performed for our SARS-CoV-2 MGS measurements.
+Third, RT-qPCR, Qubit, and MGS each have distinct sources of experimental bias that impact the resulting measurements.
+Multiplicative bias in measurements that is consistent across samples does not impact relative comparisons; however, such consistency is difficult to verify.
+
+_Estimating PMMoV-normalized SARS-CoV-2 concentrations_:
+To estimate the abundance of SARS-CoV-2 relative to PMMoV (@fig-qpcr-sars2-vs-pmmov-traj), we first estimate $\Delta C_q$ ($C_q$ of PMMoV minus $C_q$ of SARS-CoV-2) for each sample via linear regression on RT-qPCR replicates across both viral targets. We then estimate the ratio of genome copies of SARS-CoV-2 to PMMoV by $2^{\Delta C_q}$. As noted above, this estimate assumes optimal qPCR efficiency and only provides the ratio compared to an arbitrary baseline. Only relative differences between samples are interpretable; for visualization, we scale ratios by dividing by the median value across all samples.
+
+## Sequencing
+
+For a pilot round of MGS, we selected four days in December across two weeks which were evenly split between two distinct days of the week (Tuesday and Friday) and our two different sample handlers (@tbl-mgs-dates).
+
+In prior analysis of comparable public wastewater datasets (@critschristoph2021geno, @rothman2021rnav; analysis not shown) indicated that, even with steps taken to remove bacteria prior to extraction (including both filtration and bacterial ribodepletion), we observed that bacterial rRNA tends to dominate MGS data, with eukaryotic rRNA being a relatively minor component.
+We therefore chose to include a bacterial ribodepletion step during library preparation.
+To assess the efficacy of bacterial ribodepletion, we sequenced each sample with and without ribodepletion, resulting in 32 total sequencing conditions (4 dates × 4 sample sources × 2 ribodepletion states).
+Analysis of the composition of ribodepleted and non-depleted samples confirmed the dominance of bacteria among rRNA sequences and the utility of bacterial ribodepletion for reducing these sequences ([Appendix 2](#sec-ribodepletion)).
+
+Prior to submission for sequencing, we treated a single 15 μL aliquot of purified total nucleic acids to remove DNA using the Invitrogen TURBO DNA-free Kit according to manufacturer's instructions, then split the aliquot in two.
+We then submitted these 32 aliquots for library preparation (including ribodepletion) and sequencing to the MIT BioMicro Center. Aliquot's receiving ribodepletion were treated with the [NEBNext rRNA Depletion Kit (Bacteria)](https://www.neb.com/en-us/products/e7850-nebnext-rrna-depletion-kit-bacteria). Libraries were then prepared for sequencing using the [NEBNext® Ultra™ II Directional RNA Library Prep Kit](https://www.neb.com/en-us/products/e7760-nebnext-ultra-ii-directional-rna-library-prep-kit-for-illumina) and sequenced on the Illumina NovaSeq 6000 platform, generating 2×150bp reads. An incident during library prep required several of the depletion preps to be repeated. The sequencing center redid all depletion preps, resulting in two depleted libraries for 9 of the 16 samples, which we combined the data from prior to our MGS data analysis. In total, these data comprised 3.3B read pairs (RNA; 2.1B with ribodepletion and 1.2B without).
+
+```{r}
+#| label: tbl-mgs-dates
+#| tbl-cap: "**We prepared samples from four days in December for a pilot round of MGS.**"
+meta_processed |>
+  filter(collection_date %in% mgs_dates) |>
+  select(collection_date, sample_processed_by) |>
+  distinct() |>
+  transmute(
+    collection_date,
+    day_of_week = collection_date |> wday(label = TRUE, abbr = TRUE),
+    handler = sample_processed_by
+  ) |>
+  rename_with(\(x) janitor::make_clean_names(x, "sentence")) |>
+  gt() |>
+  gt_base_styling()
+```
+
+Non-depleted libraries were dominated by rRNA, and are ill-suited for pathogen monitoring. Therefore we only consider the ribodepleted libraries in our main results. However, the overall efficacy of depletion and its differences between sample types are considered in [Appendix 2](#sec-ribodepletion).
+
+## MGS data analysis
+
+We analyzed data using the Nucleic Acid Observatory's [Viral MGS Analysis Pipeline (v2.3.0)](https://github.com/securebio/nao-mgs-workflow/tree/2.3.0), which proceeds as follows:
+
+1. *Preprocessing:* Raw demultiplexed sequencing data (demultiplexed paired FASTQ files) are preprocessed through FASTP to remove adapter-contamination and low-quality sequences. Raw and FASTP-cleaned reads are run through FASTQC and MultiQC to check sequencing quality.
+2. *Shallow taxonomic profiling:* Preprocessed read pairs from each sample are randomly subset to 1 million read pairs, which are then partitioned into ribosomal & non-ribosomal sequences with BBDuk using the SILVA SSU and LSU version 138.1 databases. Both ribosomal and non-ribosomal sequences then undergo taxonomic classification with Kraken2 (using the Standard reference database) to get an overall taxonomic breakdown for the sample.
+3. *Deep human-virus profiling:* In parallel to (2), all preprocessed reads from each sample are screened for human-infecting virus reads as follows:
+   1. Read pairs are aligned with Bowtie2 against a custom database of human-virus genomes generated as described in @grimm2025infe: "by obtaining all human-infecting virus taxonomy identifiers from Virus-Host DB (37); expanding this list to include all descendant identifiers; downloading all viral genomes corresponding to these identifiers from Genbank (38); and filtering the resulting database to remove transgenic and contaminated sequences."
+   2. Putative human-viral read pairs are then filtered by screening against known common contaminants (human, cow, pig, mouse and E. coli, as well as various genetic engineering vectors) using Bowtie2, discarding matching reads.
+   3. Surviving read pairs are merged into single sequences, deduplicated, and run through Kraken2 using the Standard database. Reads that Kraken2 assigns to non-HV taxa are discarded.
+   4. Finally, read pairs are annotated as human-viral if they either (a) are assigned to HV taxa by both Bowtie2 and Kraken2, or (b) are unassigned by Kraken2 and exceed a Bowtie2 alignment score threshold (alignmentScore/ln(readLength) \>= 20).
+   5. Each human-viral read pair is assigned an NCBI taxonomy ID (taxid) corresponding to the best alignment found by Bowtie2.
+   6. The total number of read pairs assigned to a human-virus genus are found by summing the counts for all taxids descending from that genus's taxid.
+
+The taxonomic and human-virus profiling workflows each have limitations which affect our downstream use and interpretation of their results. The taxonomic profiling workflow uses the Kraken2 Standard database, which is targeted at prokaryotic and viral identification. It contains RefSeq genomes from archaea, bacteria, and viruses, along with plasmids, human, and UniVec Core (vector contamination) sequences included primarily to reduce prokaryotic and viral misclassification. Among eukaryotes, only the human (_Homo sapiens_) reference genome is included, along with some plasmids from various other eukaryotic organisms. Among non-ribosomal read pairs classified as _Eukaryota_, 99% are classified to _Homo sapiens_; however, due to the limited database we are unable to confidently say that read pairs classified to _Homo sapiens_ are in fact derived from humans rather than other eukaryotes that could plausibly shed RNA into wastewater (for example, rats or other animals, or even fungi). Moreover, RefSeq is a relatively limited set of prokaryotic and viral genomes--read pairs from prokaryotes and viruses not represented in the database are likely to be misclassified to their closest relative or simply left unclassified.
+
+The human-virus profiling workflow aims to overcome these database limitations by using an expanded set of human virus genomes from the much larger GenBank database. It also uses alignment-based mapping (with Bowtie2), which tends to be more sensitive and specific than Kraken2's k-mer-based mapping. However, this combination is not without drawbacks. Our pipeline assigns read pairs to the taxid associated with the Bowtie2 best match (with random tie breaking), regardless of whether genomes from other taxids are similarly good matches. As a result, our pipeline may assign read pairs to lower taxonomic levels (e.g. species or subspecies) than justified by the data. To mitigate this issue, we only use the genus associated with each read-pair assignment in the present analysis. Another issue is that, by only including human viruses in our Bowtie2 database, our pipeline can be expected to assign read pairs from animal viruses to their closely-related human-viral relatives. We do not expect animal viruses to be present in airplane samples; however, they plausibly could be in municipal samples. If a significant fraction of read pairs from municipal samples classified as human viral were in fact from animals, then the increased sensitivity in airplane wastewater presented in the Results would be an underestimate. Thus, the possible misclassification of animal viruses as human does not affect our overall conclusion.
+
+*Calculating relative abundances*:
+Relative abundances of human viral genera were computed from deep human-virus profiling by dividing the number of deduplicated reads assigned to the genus by the total number of reads sequenced (prior to any quality filtering or deduplication).
+This definition is meant to reflect the amount of nonredundant information available for detecting a pathogen for a given amount of sequencing effort.
+
+Relative abundances of other taxa were computed from shallow taxonomic profiling by dividing the number of non-ribosomal reads assigned to that taxon (without deduplication) by the number of reads in the subset that underwent shallow profiling.
+Here we avoid deduplication because 1) deduplication rates from a small subset are not representative of the full set of reads and 2) our aim with these taxa is to understand the taxonomic composition of the reads regardless of whether reads carry redundant genomic information.
+
+## Selection of human- and sewer-associated comparison taxa
+
+To evaluate our hypothesis that a reduction in sewer-associated microbes were driving variation in human virusus, we selected a range of comparison taxa that are associated with the human fecal microbiome or the sewer microbiome.
+The human-associated taxa include diet-derived plant viruses, prominent members of the human gut microbiome, and humans themselves (_Homo sapiens_).
+We included plant viruses from the genus _Tobamovirus_ and several of its species: Pepper mild mottle virus (PMMoV), Tobacco mosaic virus, and Cucumber mosaic virus.
+From the gut microbiome, we include the bacterial genus _Bacteroides_, a dominant member of the human gut microbiome which is far less prominent in municipal wastewater.
+We also include the genus of DNA viruses _Carjivirus_, viruses that infect _Bacteroides_ and are highly abundant in the human gut (@smith2023bact, @ramosbarbero2024recr).
+For sewer-associated taxa, we included four bacterial genera---_Acinetobacter_, _Aeromonas_, _Arcobacter_, and _Trichococcus_---found to be highly abundant in US and global studies of sewage communities and thought to reside in sewer pipes (@mclellan2019unex).
+We also include the species _Bacteroides graminisolvens_, which is related to prominent gut _Bacteroides_ but has been found to be specifically associated with sewer pipes (@feng2019high).
+
+## Public health comparison data
+
+We obtained Massachusetts COVID-19 surveillance data from the Massachusetts Department of Public Health (MDPH) 2023–2024 archived COVID-19 reporting dashboard data (`https://www.mass.gov/lists/archive-of-covid-19-data-in-massachusetts`; downloaded 2025-05-25). We extracted county-level weekly positive-tests totals and aggregated Suffolk, Norfolk, and Middlesex counties to approximate the Deer Island Wastewater Treatment Plant catchment.
+
+## Statistical data analysis and visualization software
+
+Analysis and visualization of total (Qubit) and targeted (RT-qPCR) nucleic-acid measurements and of MGS pipeline results were performed in R (@rcore2025rala) with tidyverse (@wickham2019welc).
+Standard linear regression was performed with the `lm` function from base R.
+Bayesian regression modeling was performed with Stan (@stan2023stan) via the rstanarm R package (@goodrich2024rstan) using default priors.
+
+## Data and code availability
+
+_Placeholder for statement of data and code availability._
+
+Code along with metadata, RT-qPCR measurements, and Qubit measurements will be published on GitHub.
+MGS data with human reads removed is available through the NCBI Sequence Read Archive (SRA) under [BioProject ID PRJNA1460372](http://www.ncbi.nlm.nih.gov/bioproject/1460372).
+
+# Appendix 1: Taxonomic composition
+
+We first looked at high-level composition in terms of the fraction of reads classified as ribosomal and at the domain level (for non-ribosomal reads), as reported in the Results (@fig-comp, @tbl-comp).
+
+We next looked to see if high-level differences could be observed in bacterial and viral composition. Substantial differences can be seen in class-level composition among non-ribosomal bacterial reads (@fig-comp-bac-class) between airplane and municipal wastewater. In particular, airplane samples show increased fractions of _Clostridia_ and _Actinomycetes_ and reduced fractions of other classes including _Epsilonproteobacteria_, _Fusobacteriia_, and _Gammaproteobacteria_.
+
+```{r}
+#| label: fig-comp-bac-class
+#| fig-cap: '**Bacterial class composition (non-ribosomal reads only) in ribodepleted libraries.** Classes that are less than 0.02 in every sample are grouped as "Other." Classes are ordered by average fraction across all samples.'
+
+bac_class <- ps_tax |>
+  filter_sample_data(ribo_depleted == TRUE) |>
+  filter_tax_table(rank == "class", domain == "Bacteria", ribosomal == FALSE) |>
+  as_tibble() |>
+  mutate(.by = c(.sample),
+    frac = .abundance / sum(.abundance)
+  )
+
+# Pick all classes that appear in at least 0.02 in any sample
+bac_class_max <- bac_class |>
+  summarize(.by = c(class),
+    across(frac, max)
+  ) |>
+  arrange(desc(frac))
+bac_class_2perc <- bac_class_max |>
+  filter(frac >= 0.02) |>
+  pull(class)
+bac_class_other <- setdiff(bac_class$class, bac_class_2perc)
+# There should be exactly 11 families with a max frac of 0.02
+stopifnot(identical(length(bac_class_2perc), 11L))
+
+bac_class_plot <- bac_class |>
+  # Manually combine the Other classes, then relevel
+  mutate(
+    name_plot = fct_other(class, drop = bac_class_other)
+  ) |>
+  summarize(.by = c(.sample, name_plot, collection_date, sample_source_plot),
+    across(frac, sum)
+  ) |>
+  mutate(
+    name_plot = fct_reorder(name_plot, frac, .fun = mean) |> fct_relevel("Other")
+  )
+
+colors_tax_bac <- set_names(
+  RColorBrewer::brewer.pal(12, "Set3"),
+  bac_class_plot$name_plot |> levels()
+)
+
+bac_class_plot |>
+  ggplot(aes(
+    x = factor(collection_date), y = frac,
+    fill = name_plot
+  )) +
+  labs(
+    x = "Collection date",
+    fill = "Class",
+    y = "Fraction"
+  ) +
+  facet_row(~sample_source_plot) +
+  scale_fill_manual(values = colors_tax_bac) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
+  ) +
+  geom_col()
+```
+
+```{r, include = FALSE, echo = FALSE}
+# What are the _Fusobacteriia_ species driving this difference?
+x <- ps_tax |>
+  filter_sample_data(ribo_depleted == TRUE) |>
+  filter_tax_table(class == "Fusobacteriia", ribosomal == FALSE, rank == "species") |>
+  merge_samples2("sample_source", funs = list(sample_sum = sum)) |>
+  as_tibble() |>
+  mutate(.by = c(.sample),
+    frac = .abundance / sum(.abundance)
+  )
+x |>
+  filter(sample_type != "airplane") |>
+  summarize(.by = c(species),
+    across(frac, median)
+  ) |>
+  arrange(desc(frac)) |>
+  slice_head(n=5)
+```
+
+The composition of viral families (@fig-comp-vir-fam) among samples dominated by the family of plant viruses _Virgaviridae_; however, municipal samples also have large fractions from families of the _Leviviricetes_ class of RNA phages, including _Fiersviridae_, _Steitzviridae_, _Blumeviridae_, and _Solspiviridae_.
+These RNA phages appear far less abundant in airplane samples.
+Excluding _Virgaviridae_ (Panel B), we see that two families associated with human enteric disease, _Astroviridae_ and _Caliciviridae_, appear much more prominently in airport than in municipal samples.
+_Alphaflexiviridae_, a family which infects plants and fungi, is apparent across all sample types but especially in one airplane sample.
+
+```{r}
+#| label: fig-comp-vir-fam
+#| fig-cap: '**Viral family composition with (Panel A) and without (Panel B) the family of plant viruses _Virgaviridae_.** Panel A shows fractions among all reads assigned to a viral family; families that are less than 0.01 in every sample are grouped as "Other." Panel B shows the same families from Panel A, but with fractions recomputed after removing _Virgaviridae_. Families are ordered by average fraction across all samples, with most abundant (_Virgaviridae_ in Panel A, _Fiersviridae_ in Panel B) at the bottom.'
+#| warning: false
+#| fig-asp: 1.2
+virus_family <- ps_tax |>
+  filter_sample_data(ribo_depleted == TRUE) |>
+  filter_tax_table(rank == "family", domain == "Viruses", ribosomal == FALSE) |>
+  as_tibble() |>
+  mutate(.by = c(.sample),
+    frac = .abundance / sum(.abundance)
+  )
+
+approach <- "max"
+
+if (approach == "mean") {
+# Approach 1:
+# Show the top 10 families weighted by collection site (BOS or DITP)
+  virus_family_summary <- virus_family |>
+    summarize(.by = c(family, collection_site),
+      across(frac, mean)
+    ) |>
+    summarize(.by = family,
+      across(frac, mean)
+    ) |>
+    arrange(desc(frac))
+  virus_family_top10 <- virus_family_summary |>
+    slice_max(n = 10, frac) |>
+    pull(family)
+  virus_family_other <- setdiff(virus_family_bysite$family, virus_family_top10)
+} else if (approach == "max") {
+  # Approach 2:
+  # Pick all families that appear in at least 0.01 in any sample
+  virus_family_max <- virus_family |>
+    summarize(.by = c(family),
+      across(frac, max)
+    ) |>
+    arrange(desc(frac))
+  # There are exactly 10 families with a max frac of 0.01
+  stopifnot(identical(
+    virus_family_max |> filter(frac >= 0.01) |> nrow(),
+    10L
+  ))
+  virus_family_top10 <- virus_family_max |>
+    slice_max(n = 10, frac) |>
+    pull(family)
+  virus_family_other <- setdiff(virus_family$family, virus_family_top10)
+}
+
+virus_family_plot <- virus_family |>
+  # Manually combine the Other families, then relevel
+  mutate(
+    name_plot = fct_other(family, drop = virus_family_other)
+  ) |>
+  summarize(.by = c(.sample, name_plot, collection_date, sample_source_plot),
+    across(frac, sum)
+  ) |>
+  mutate(
+    name_plot = fct_reorder(name_plot, frac, .fun = mean) |> fct_relevel("Other")
+  )
+virus_family_plot_no_virga <- virus_family_plot |>
+  # Set Virga to 0 rather than filtering out the rows so that it remains in the color scale
+  mutate(
+    frac = ifelse(name_plot == "Virgaviridae", 0, frac)
+  ) |>
+  mutate(.by = c(.sample),
+    frac = frac / sum(frac)
+  )
+
+colors_tax_viruses <- set_names(
+  RColorBrewer::brewer.pal(11, "Set3"),
+  virus_family_plot$name_plot |> levels()
+)
+
+ggplot(virus_family_plot) / ggplot(virus_family_plot_no_virga) +
+  plot_annotation(tag_levels = "A") +
+  plot_layout(
+    guides = "collect"
+  ) &
+  labs(
+    x = "Collection date",
+    fill = "Family",
+    y = "Fraction"
+  ) &
+  facet_row(~sample_source_plot) &
+  scale_fill_manual(values = colors_tax_viruses) &
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
+  ) &
+  geom_col(aes(
+    x = factor(collection_date),
+    y = frac,
+    fill = name_plot
+  ))
+```
+
+# Appendix 2: Ribosomal composition and depletion {#sec-ribodepletion}
+
+Taxonomic characterization of reads classified as ribosomal indicates that the vast majority of ribosomal RNA (rRNA) in our extractions is bacterial in origin.
+In non-depleted samples, an overwhelming majority of ribosomal reads are classified as bacterial (@fig-comp-rrna, top row).
+In ribodepleted samples, the majority of reads are also classified as bacterial; however, we also see significant minorities classified as archaeal and eukaryotic and a large minority (nearly 50% in one sample) are left unclassified (@fig-comp-rrna, bottom row), reflecting limits in the ability of our bioinformatics workflow to classify ribosomal reads.
+
+```{r}
+#| label: fig-comp-rrna
+#| fig-cap: "**Domain-level taxonomic composition of ribosomal reads in ribodepleted and non-depleted libraries.** Reads were classified as ribosomal by BBDuk based on k-mer similarity to sequences in the SILVA SSU and LSU database; then ribosomal and non-ribosomal reads were classified to the domain level with Kraken2. This figure shows the composition among just ribosomal reads for depleted and non-depleted libraries, whereas @fig-comp shows the composition among all (ribosomal and non-ribosomal) reads for just depleted libraries."
+#| fig-asp: 0.8
+ps_tax_comp_rrna_df <- ps_tax |>
+  # filter_sample_data(ribo_depleted == TRUE) |>
+  filter_tax_table(
+    ribosomal == TRUE,
+    rank %in% c("unclassified", "domain")
+  ) |>
+  as_tibble() |>
+  mutate(.by = c(.sample),
+    frac = .abundance / sum(.abundance)
+  ) |>
+  mutate(
+    name_plot = case_when(
+      rank == "unclassified" ~ "Unclassified",
+      TRUE ~ domain
+    ),
+    ribo_depleted_plot = ifelse(ribo_depleted,
+      "Depleted",
+      "Nondepleted"
+    ) |> fct_relevel("Nondepleted")
+  )
+ps_tax_comp_rrna_df |>
+  ggplot(aes(
+    x = factor(collection_date), y = frac,
+    fill = name_plot
+  )) +
+  labs(
+    x = "Collection date",
+    fill = "Domain",
+    y = "Fraction of ribosomal reads"
+  ) +
+  facet_grid(ribo_depleted_plot~sample_source_plot) +
+  scale_fill_brewer(palette = "Set3") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)
+  ) +
+  geom_col()
+```
+
+The lower baseline level of rRNA may be due to the hypothesized greater ratio of human to sewer microbial content in airplane samples; however, it is unclear whether the sewer microbiome intrinsically has a greater ribosomal fraction than the human microbiome. Another possible explanation lies in the interaction between our processing protocol and the distinct chemical environment of the airplane samples. As our protocol employs filtration to remove intact cells prior to extraction, most ribosomal reads may come from cell-free rRNA. The presence of airplane lavatory treatment fluid might cause this unprotected rRNA to preferentially degrade in airplane samples. Yet a third possibility is that the pre-filter used in our airplane protocol improves the removal of intact bacteria.
+
+The greater ribodepletion efficiency (shown in [Results]) may also have multiple explanations.
+First, the lower baseline concentration of rRNA in airplane samples may lead to improved depletion performance. The combination of a lower fraction of rRNA out of all RNA, as seen in non-depleted samples in @fig-ribodepletion, with a lower concentration of total RNA, as seen in @fig-qubit, imply that airplane samples have a much lower concentration of rRNA than municipal samples. Ribodepletion kits can become saturated at overly high rRNA levels, leading to reduced depletion performance---plausibly such saturation is occurring in municipal but not airplane samples. Second, the ribodepletion kit may have better coverage for bacteria in the airplane samples rather than in municipal samples. NEB provides limited information about the bacterial reference sequences used for the design of the probes in their kit. However, it is plausible that the references are biased towards bacteria found in the human rather than sewer microbiome, in which case we can expect ribodepletion to work less efficiently in the sewer-dominated municipal samples.
+
+# Additional tables
+
+```{r}
+#| label: tbl-sampling
+#| tbl-cap: "**Samples were collected and processed in replicate from late October through late December 2023.**"
+#| tbl-pos: "H"
+sampling_summary |>
+  relocate(collection_site, .before = sample_type) |>
+  rename(
+    source_id = sample_source,
+    # collection_site = collection_site,
+    # Shorten names to make table narrower
+    site = collection_site,
+    dates = total_dates,
+    replicates = total_replicates,
+  ) |>
+  rename_with(\(x) janitor::make_clean_names(x, "sentence")) |>
+  rename_with(\(x) str_replace(x, " id$", " ID")) |>
+  gt() |>
+  gt_base_styling()
+```
+
+```{r}
+#| label: tbl-comp
+#| tbl-cap: "**Domain-level taxonomic composition estimated from a subset of 1M read pairs, as shown in @fig-comp.** Table shows the average fractions across samples from each sample source. The 'Ribosomal' category includes any reads identified as ribosomal regardless of taxonomic domain. All remaining categories only include non-ribosomal reads."
+#| tbl-pos: "H"
+tax_comp_by_source |>
+  pivot_wider(names_from = sample_source_plot, values_from = frac) |>
+  rename(Category = category) |>
+  arrange(Category) |>
+  gt() |>
+  fmt_number(n_sigfig = 2) |>
+  gt_base_styling()
+```
+
+```{r}
+#| label: tbl-model-estimates
+#| tbl-cap: "**Estimated fold increases in relative abundance in airplane versus municipal influent for various human viruses and reference taxa.** Estimation was performed with a Bayesian negative binomial regression using the rstanarm package. The table shows the median and 50% and 95% quantile intervals."
+#| tbl-pos: "H"
+nb_intervals |>
+  filter(
+    name == "triturator_vs_influent",
+    .width %in% c(.50, .95)
+  ) |>
+  mutate(
+    # Put model coefficients on multiplicative scale
+    across(c(value, .lower, .upper), exp),
+    taxon_name = fct_reorder(taxon_name_plot, value, .desc = TRUE),
+    across(where(is.numeric), \(x) signif(x, 2)),
+    interval = str_glue("({.lower}, {.upper})"),
+    .width = str_glue("{100*.width}% interval"),
+  ) |>
+  arrange(taxon_type_detail, taxon_name) |>
+  select(
+    taxon_type_detail,
+    Taxon = taxon_name_plot,
+    Estimate = value,
+    .width,
+    interval
+  ) |>
+  pivot_wider(names_from = .width, values_from = interval) |>
+  group_by(taxon_type_detail) |>
+  gt() |>
+  fmt_number(n_sigfig = 2) |>
+  gt_base_styling()
+```
+
+::: {.content-visible when-format="pdf"}
+\clearpage
+:::
+
+# Additional figures
+
+```{r}
+#| label: fig-qubit
+#| fig-cap: "**Airplane wastewater consistently yielded more double-stranded DNA (dsDNA) but less RNA than municipal wastewater.** Samples collected on or after December 4 (indicated by the grey region) were measured with a different protocol which yielded higher concentration estimates; however, the differences between sample sources (Panel A, concentration in ng/µL) and the RNA:dsDNA ratios (Panel B) remained similar."
+#| fig-width: 10
+#| fig-asp: 0.8
+#| warning: false
+
+## Plot showing individual DNA and RNA measurements
+qubit_plot <- qubit |>
+  left_join(meta_processed, by = "processed_sample_id") |>
+  filter(
+    collection_date >= as.Date("2023-10-31"),
+    collection_date <= as.Date("2024-01-01"),
+    sample_source != "NEG"
+  )
+# Collection date denoting the start of the 2024 measurements, for marking batch effect
+date_measure_2024 <- qubit_plot |>
+  filter(measurement_year == "2024") |>
+  pull(collection_date) |>
+  min()
+
+p_traj <- qubit_plot |>
+  ggplot(aes(collection_date, conc_sample_oor, color = sample_source_plot)) +
+  theme(panel.spacing.x = unit(5, "mm")) +
+  facet_wrap(~assay) +
+  scale_color_manual(values = colors_sample_source_plot) +
+  scale_y_log10() +
+  labs(
+    x = "Collection date",
+    # y = "Concentration (ng/μL)",
+    # Standard R pdf device has issue with unicode μ, so use R expression instead
+    y = expression("Concentration (ng/"*mu*"L)"),
+    color = "Sample source",
+  ) +
+  annotate("rect",
+    xmin = date_measure_2024 - 1,
+    xmax = as.Date(Inf),
+    ymin = 0,
+    ymax = Inf,
+    fill = "grey95"
+  ) +
+  geom_vline(xintercept = mgs_dates, color = "grey80", linetype = "dashed") +
+  geom_point()
+
+## Plots showing ratio of RNA to DNA.
+qubit_wide <- qubit_plot |>
+  select(processed_sample_id, measurement_year, na_type, conc_sample_oor) |>
+  pivot_wider(names_from = na_type, values_from = conc_sample_oor) |>
+  mutate(rna_dna = RNA / dsDNA) |>
+  left_join(meta_processed, by = "processed_sample_id") |>
+  filter(
+    sample_source %in% c("BOS", "DCS", "DNI", "DSI")
+  )
+# NOTE: October 31 is missing DNA measurements
+stopifnot(identical(
+  qubit_wide |> filter(is.na(rna_dna)) |> pull(collection_date) |> unique(),
+  as.Date("2023-10-31")
+))
+qubit_wide <- qubit_wide |> filter(collection_date != as.Date("2023-10-31"))
+
+p_ratio_traj <- qubit_wide |>
+  ggplot(aes(collection_date, rna_dna, color = sample_source_plot)) +
+  # theme(legend.position = "bottom") +
+  scale_color_manual(values = colors_sample_source_plot) +
+  scale_y_log10() +
+  labs(
+    x = "Collection date",
+    y = "Ratio of RNA to dsDNA",
+    color = "Sample source",
+  ) +
+  annotate("rect",
+    xmin = date_measure_2024 - 1,
+    xmax = as.Date(Inf),
+    ymin = 0,
+    ymax = Inf,
+    fill = "grey95"
+  ) +
+  geom_vline(xintercept = mgs_dates, color = "grey80", linetype = "dashed") +
+  geom_point()
+
+p_ratio_dist <- qubit_wide |>
+  ggplot(aes(
+    y = sample_source, x = rna_dna,
+    color = sample_source_plot,
+    fill = sample_source_plot,
+    )
+  ) +
+  theme(legend.position = "none") +
+  scale_color_manual(values = colors_sample_source_plot) +
+  scale_fill_manual(values = colors_sample_source_plot) +
+  scale_x_log10() +
+  labs(
+    y = "Sample source",
+    x = "Ratio of RNA to dsDNA",
+  ) +
+  ggdist::stat_dots()
+
+p_traj / (p_ratio_traj + p_ratio_dist) +
+  plot_annotation(tag_levels = "A") +
+  plot_layout(
+    guides = "collect"
+  )
+```
+
+::: {.content-visible when-format="pdf"}
+\clearpage
+:::
+
+# Disclaimer {.appendix}
+
+The findings and conclusions of this report are those of the authors and do not necessarily represent the official position of the U.S. Centers for Disease Control and Prevention.
+
+# Acknowledgments {.appendix}
+
+We thank Cara Seaman, the DITP sampling team, and Steve Rhode for providing samples from Deer Island Treatment Plant.
+
+::: {.content-visible unless-format="html"}
+# References
+:::
+
+::: {.content-visible when-format="html"}
+# Session info {.appendix}
+
+<details><summary>Click for session info</summary>
+```{r, R.options = list(width = 83)}
+sessioninfo::session_info()
+```
+</details>
+:::
+

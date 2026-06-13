@@ -1,0 +1,134 @@
+sample name,date collected,sample source,bottle #,receiver,collection site,sample type,sample desc,date received,time received,initial volume (mL),sample source modifier
+C-231031-DNI-B1,2023-10-31,DNI,1,A,DITP,influent,DITP North System influent,2023-10-31,10:00,500,none
+C-231031-DSI-B1,2023-10-31,DSI,1,A,DITP,influent,DITP South System influent,2023-10-31,10:00,500,none
+C-231031-DCS-B1,2023-10-31,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-10-31,10:00,50,none
+C-231101-DNI-B1,2023-11-01,DNI,1,B,DITP,influent,DITP North System influent,2023-11-01,10:35,500,none
+C-231101-DSI-B1,2023-11-01,DSI,1,B,DITP,influent,DITP South System influent,2023-11-01,10:35,500,none
+C-231101-DCS-B1,2023-11-01,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-01,10:35,50,none
+C-231102-DNI-B1,2023-11-02,DNI,1,B,DITP,influent,DITP North System influent,2023-11-02,10:25,500,none
+C-231102-DSI-B1,2023-11-02,DSI,1,B,DITP,influent,DITP South System influent,2023-11-02,10:25,500,none
+C-231102-DCS-B1,2023-11-02,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-02,10:25,50,none
+C-231103-DNI-B1,2023-11-03,DNI,1,A,DITP,influent,DITP North System influent,2023-11-03,10:15,500,none
+C-231103-DSI-B1,2023-11-03,DSI,1,A,DITP,influent,DITP South System influent,2023-11-03,10:15,500,none
+C-231103-DCS-B3,2023-11-03,DCS,3,A,DITP,sludge,DITP combined-system sludge,2023-11-03,10:15,50,none
+C-231106-DNI-B1,2023-11-06,DNI,1,B,DITP,influent,DITP North System influent,2023-11-06,10:50,500,none
+C-231106-DSI-B1,2023-11-06,DSI,1,B,DITP,influent,DITP South System influent,2023-11-06,10:50,500,none
+C-231106-DCS-B1,2023-11-06,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-06,10:50,50,none
+C-231107-DNI-B1,2023-11-07,DNI,1,A,DITP,influent,DITP North System influent,2023-11-07,10:15,500,none
+C-231107-DSI-B1,2023-11-07,DSI,1,A,DITP,influent,DITP South System influent,2023-11-07,10:15,500,none
+C-231107-DCS-B1,2023-11-07,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-07,10:15,50,none
+C-231108-DNI-B1,2023-11-08,DNI,1,B,DITP,influent,DITP North System influent,2023-11-08,10:45,500,none
+C-231108-DSI-B1,2023-11-08,DSI,1,B,DITP,influent,DITP South System influent,2023-11-08,10:45,500,none
+C-231108-DCS-B1,2023-11-08,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-08,10:45,50,none
+C-231109-DNI-B1,2023-11-09,DNI,1,A,DITP,influent,DITP North System influent,2023-11-09,10:30,500,none
+C-231109-DSI-B1,2023-11-09,DSI,1,A,DITP,influent,DITP South System influent,2023-11-09,10:30,500,none
+C-231109-DCS-B1,2023-11-09,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-09,10:30,50,none
+C-231113-DNI-B1,2023-11-13,DNI,1,A,DITP,influent,DITP North System influent,2023-11-13,10:50,500,none
+C-231113-DSI-B1,2023-11-13,DSI,1,A,DITP,influent,DITP South System influent,2023-11-13,10:50,500,none
+C-231113-DCS-B1,2023-11-13,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-13,10:50,50,none
+C-231113-BST-B1,2023-11-13,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-11-13,13:00,250,none
+C-231114-DNI-B1,2023-11-14,DNI,1,A,DITP,influent,DITP North System influent,2023-11-14,10:30,500,none
+C-231114-DSI-B1,2023-11-14,DSI,1,A,DITP,influent,DITP South System influent,2023-11-14,10:30,500,none
+C-231114-DCS-B1,2023-11-14,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-14,10:30,50,none
+C-231114-BST-B1,2023-11-14,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-11-14,12:40,250,none
+C-231115-DNI-B1,2023-11-15,DNI,1,B,DITP,influent,DITP North System influent,2023-11-15,11:15,500,none
+C-231115-DSI-B1,2023-11-15,DSI,1,B,DITP,influent,DITP South System influent,2023-11-15,11:15,500,none
+C-231115-DCS-B1,2023-11-15,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-15,11:15,50,none
+C-231115-BST-B1,2023-11-15,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-11-15,12:30,250,none
+C-231116-DNI-B1,2023-11-16,DNI,1,B,DITP,influent,DITP North System influent,2023-11-16,10:30,500,none
+C-231116-DSI-B1,2023-11-16,DSI,1,B,DITP,influent,DITP South System influent,2023-11-16,10:30,500,none
+C-231116-DCS-B1,2023-11-16,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-16,10:30,50,none
+C-231117-DNI-B1,2023-11-17,DNI,1,B,DITP,influent,DITP North System influent,2023-11-17,11:00,500,none
+C-231117-DSI-B1,2023-11-17,DSI,1,B,DITP,influent,DITP South System influent,2023-11-17,11:00,500,none
+C-231117-DCS-B1,2023-11-17,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-17,11:00,50,none
+C-231117-BST-B1,2023-11-17,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-11-17,12:45,250,none
+C-231120-DNI-B1,2023-11-20,DNI,1,A,DITP,influent,DITP North System influent,2023-11-20,10:50,500,none
+C-231120-DSI-B1,2023-11-20,DSI,1,A,DITP,influent,DITP South System influent,2023-11-20,10:50,500,none
+C-231120-DCS-B1,2023-11-20,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-20,10:50,50,none
+C-231120-BST-B1,2023-11-20,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-11-20,12:45,250,none
+C-231121-DNI-B1,2023-11-21,DNI,1,A,DITP,influent,DITP North System influent,2023-11-21,10:15,500,none
+C-231121-DSI-B1,2023-11-21,DSI,1,A,DITP,influent,DITP South System influent,2023-11-21,10:15,500,none
+C-231121-DCS-B1,2023-11-21,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-21,10:15,50,none
+C-231121-BST-B1,2023-11-21,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-11-21,13:15,250,none
+C-231122-DNI-B1,2023-11-22,DNI,1,A,DITP,influent,DITP North System influent,2023-11-22,10:20,500,none
+C-231122-DSI-B1,2023-11-22,DSI,1,A,DITP,influent,DITP South System influent,2023-11-22,10:20,500,none
+C-231122-DCS-B1,2023-11-22,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-22,10:20,50,none
+C-231127-DNI-B1,2023-11-27,DNI,1,B,DITP,influent,DITP North System influent,2023-11-27,10:05,500,DNI - East only
+C-231127-DSI-B1,2023-11-27,DSI,1,B,DITP,influent,DITP South System influent,2023-11-27,10:05,500,none
+C-231127-DCS-B1,2023-11-27,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-27,10:05,50,none
+C-231127-BST-B1,2023-11-27,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-11-27,12:50,250,none
+C-231128-DNI-B1,2023-11-28,DNI,1,B,DITP,influent,DITP North System influent,2023-11-28,10:25,500,none
+C-231128-DSI-B1,2023-11-28,DSI,1,B,DITP,influent,DITP South System influent,2023-11-28,10:25,500,none
+C-231128-DCS-B1,2023-11-28,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-28,10:25,50,none
+C-231129-DNI-B1,2023-11-29,DNI,1,B,DITP,influent,DITP North System influent,2023-11-29,11:05,500,none
+C-231129-DSI-B1,2023-11-29,DSI,1,B,DITP,influent,DITP South System influent,2023-11-29,11:05,500,none
+C-231129-DCS-B1,2023-11-29,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-11-29,11:05,50,none
+C-231129-BST-B1,2023-11-29,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-11-29,12:20,250,none
+C-231130-DNI-B1,2023-11-30,DNI,1,A,DITP,influent,DITP North System influent,2023-11-30,10:25,500,none
+C-231130-DSI-B1,2023-11-30,DSI,1,A,DITP,influent,DITP South System influent,2023-11-30,10:25,500,none
+C-231130-DCS-B1,2023-11-30,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-11-30,10:25,50,none
+C-231130-BST-B1,2023-11-30,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-11-30,12:50,250,none
+C-231201-DNI-B1,2023-12-01,DNI,1,A,DITP,influent,DITP North System influent,2023-12-01,10:35,500,none
+C-231201-DSI-B1,2023-12-01,DSI,1,A,DITP,influent,DITP South System influent,2023-12-01,10:35,500,none
+C-231201-DCS-B1,2023-12-01,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-01,10:35,50,none
+C-231201-BST-B1,2023-12-01,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-01,12:55,250,none
+C-231204-DNI-B1,2023-12-04,DNI,1,A,DITP,influent,DITP North System influent,2023-12-04,10:50,500,none
+C-231204-DSI-B1,2023-12-04,DSI,1,A,DITP,influent,DITP South System influent,2023-12-04,10:50,500,none
+C-231204-DCS-B1,2023-12-04,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-04,10:50,50,none
+C-231204-BST-B1,2023-12-04,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-04,13:10,250,none
+C-231205-DNI-B1,2023-12-05,DNI,1,A,DITP,influent,DITP North System influent,2023-12-05,10:10,500,none
+C-231205-DSI-B1,2023-12-05,DSI,1,A,DITP,influent,DITP South System influent,2023-12-05,10:10,500,none
+C-231205-DCS-B1,2023-12-05,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-05,10:10,50,none
+C-231205-BST-B1,2023-12-05,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-05,13:10,250,none
+C-231206-DNI-B1,2023-12-06,DNI,1,A,DITP,influent,DITP North System influent,2023-12-06,10:55,500,none
+C-231206-DCS-B1,2023-12-06,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-06,10:55,50,none
+C-231206-BST-B1,2023-12-06,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-06,12:30,250,none
+C-231207-DNI-B1,2023-12-07,DNI,1,B,DITP,influent,DITP North System influent,2023-12-07,10:25,500,none
+C-231207-DSI-B1,2023-12-07,DSI,1,B,DITP,influent,DITP South System influent,2023-12-07,10:25,500,none
+C-231207-DCS-B1,2023-12-07,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-12-07,10:25,50,none
+C-231207-BST-B1,2023-12-07,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-12-07,12:55,250,none
+C-231208-DNI-B1,2023-12-08,DNI,1,B,DITP,influent,DITP North System influent,2023-12-08,10:15,500,none
+C-231208-DSI-B1,2023-12-08,DSI,1,B,DITP,influent,DITP South System influent,2023-12-08,10:15,500,none
+C-231208-DCS-B1,2023-12-08,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-12-08,10:15,50,none
+C-231208-BST-B1,2023-12-08,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-12-08,12:15,250,none
+C-231211-DNI-B1,2023-12-11,DNI,1,B,DITP,influent,DITP North System influent,2023-12-11,11:00,500,none
+C-231211-DSI-B1,2023-12-11,DSI,1,B,DITP,influent,DITP South System influent,2023-12-11,11:00,500,none
+C-231211-DCS-B1,2023-12-11,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-12-11,11:00,50,none
+C-231211-BST-B1,2023-12-11,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-12-11,12:45,250,none
+C-231212-DNI-B1,2023-12-12,DNI,1,B,DITP,influent,DITP North System influent,2023-12-12,10:35,500,none
+C-231212-DSI-B1,2023-12-12,DSI,1,B,DITP,influent,DITP South System influent,2023-12-12,10:35,500,none
+C-231212-DSI-B3,2023-12-12,DSI,3,B,DITP,influent,DITP South System influent,2023-12-12,10:35,250,none
+C-231212-DCS-B1,2023-12-12,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-12-12,10:35,50,none
+C-231212-BST-B1,2023-12-12,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-12-12,12:55,250,none
+C-231213-DNI-B1,2023-12-13,DNI,1,B,DITP,influent,DITP North System influent,2023-12-13,11:15,500,none
+C-231213-DSI-B1,2023-12-13,DSI,1,B,DITP,influent,DITP South System influent,2023-12-13,11:15,500,none
+C-231213-DCS-B1,2023-12-13,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-12-13,11:15,50,none
+C-231213-BST-B1,2023-12-13,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-12-13,12:50,250,none
+C-231214-DNI-B1,2023-12-14,DNI,1,A,DITP,influent,DITP North System influent,2023-12-14,11:30,500,none
+C-231214-DSI-B1,2023-12-14,DSI,1,A,DITP,influent,DITP South System influent,2023-12-14,11:30,500,none
+C-231214-DCS-B1,2023-12-14,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-14,11:30,50,none
+C-231214-BST-B1,2023-12-14,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-14,12:30,250,none
+C-231215-DNI-B1,2023-12-15,DNI,1,A,DITP,influent,DITP North System influent,2023-12-15,10:35,500,none
+C-231215-DSI-B1,2023-12-15,DSI,1,A,DITP,influent,DITP South System influent,2023-12-15,10:35,500,none
+C-231215-DCS-B1,2023-12-15,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-15,10:35,50,none
+C-231215-BST-B1,2023-12-15,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-15,12:40,125,none
+C-231218-DNI-B1,2023-12-18,DNI,1,A,DITP,influent,DITP North System influent,2023-12-18,11:25,500,none
+C-231218-DSI-B1,2023-12-18,DSI,1,A,DITP,influent,DITP South System influent,2023-12-18,11:25,500,none
+C-231218-DCS-B1,2023-12-18,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-18,11:25,50,none
+C-231218-BST-B1,2023-12-18,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-18,12:25,250,none
+C-231219-DNI-B1,2023-12-19,DNI,1,A,DITP,influent,DITP North System influent,2023-12-19,10:15,500,none
+C-231219-DSI-B1,2023-12-19,DSI,1,A,DITP,influent,DITP South System influent,2023-12-19,10:15,500,none
+C-231219-DCS-B1,2023-12-19,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-19,10:15,50,none
+C-231219-BST-B1,2023-12-19,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-19,13:15,250,none
+C-231220-DNI-B1,2023-12-20,DNI,1,A,DITP,influent,DITP North System influent,2023-12-20,10:55,500,none
+C-231220-DSI-B1,2023-12-20,DSI,1,A,DITP,influent,DITP South System influent,2023-12-20,10:55,500,none
+C-231220-DCS-B1,2023-12-20,DCS,1,A,DITP,sludge,DITP combined-system sludge,2023-12-20,10:55,50,none
+C-231220-BST-B1,2023-12-20,BST,1,A,BOS,triturator inflow,BOS triturator inflow,2023-12-20,12:50,50,none
+C-231221-DNI-B1,2023-12-21,DNI,1,B,DITP,influent,DITP North System influent,2023-12-21,10:35,500,DNI - West only
+C-231221-DSI-B1,2023-12-21,DSI,1,B,DITP,influent,DITP South System influent,2023-12-21,10:35,500,none
+C-231221-DCS-B1,2023-12-21,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-12-21,10:35,50,none
+C-231221-BST-B1,2023-12-21,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-12-21,12:50,250,none
+C-231222-DNI-B1,2023-12-22,DNI,1,B,DITP,influent,DITP North System influent,2023-12-22,10:20,500,none
+C-231222-DSI-B1,2023-12-22,DSI,1,B,DITP,influent,DITP South System influent,2023-12-22,10:20,500,none
+C-231222-DCS-B1,2023-12-22,DCS,1,B,DITP,sludge,DITP combined-system sludge,2023-12-22,10:20,50,none
+C-231222-BST-B1,2023-12-22,BST,1,B,BOS,triturator inflow,BOS triturator inflow,2023-12-22,12:15,100,none
