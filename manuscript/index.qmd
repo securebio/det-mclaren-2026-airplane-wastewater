@@ -1375,6 +1375,8 @@ The Massachusetts COVID-19 surveillance data used here are publicly available fr
 
 MRM, OSH, ANM, DPR, and WJB received support for this work from Coefficient Giving (formerly Open Philanthropy) via a gift to SecureBio. MRM, OSH, ANM, and WJB also received support for this work from the Musk Foundation via a gift to MIT. The funders had no role in study design, data collection and interpretation, or the decision to submit the work for publication.
 
+AMS, DG, and CWP were employed by Ginkgo Bioworks at the time of the study and received Ginkgo Bioworks stock or restricted stock units. MRM, OSH, ANM, DPR, and WJB were employees of SecureBio during the latter part of the study.
+
 We thank Cara Seaman, the DITP sampling team, and Steve Rhode for providing wastewater samples from Deer Island Wastewater Treatment Plant.
 
 The findings and conclusions of this report are those of the authors and do not necessarily represent the official position of the U.S. Centers for Disease Control and Prevention.
