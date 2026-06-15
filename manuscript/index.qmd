@@ -1346,7 +1346,7 @@ Here we avoid deduplication because 1) deduplication rates from a small subset a
 
 To evaluate our hypothesis that a reduction in sewer-associated microbes were driving variation in human virusus, we selected a range of comparison taxa that are associated with the human fecal microbiome or the sewer microbiome.
 The human-associated taxa include diet-derived plant viruses, prominent members of the human gut microbiome, and humans themselves (_Homo sapiens_).
-We included plant viruses from the genus _Tobamovirus_ and several of its species: Pepper mild mottle virus (PMMoV), Tobacco mosaic virus, and Cucumber mosaic virus.
+We included three diet-derived plant viruses: Pepper mild mottle virus (PMMoV), Tobacco mosaic virus, and Cucumber mosaic virus.
 From the gut microbiome, we include the bacterial genus _Bacteroides_, a dominant member of the human gut microbiome which is far less prominent in municipal wastewater.
 We also include the genus of DNA viruses _Carjivirus_, viruses that infect _Bacteroides_ and are highly abundant in the human gut (@smith2023bact, @ramosbarbero2024recr).
 For sewer-associated taxa, we included four bacterial genera---_Acinetobacter_, _Aeromonas_, _Arcobacter_, and _Trichococcus_---found to be highly abundant in US and global studies of sewage communities and thought to reside in sewer pipes (@mclellan2019unex).
