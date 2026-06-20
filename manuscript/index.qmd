@@ -652,11 +652,22 @@ nb_estimates <- nb_intervals |>
   select(taxon_type_detail, taxon_name_plot, value)
 nb_estimates_medians <- nb_estimates |>
   summarize(.by = taxon_type_detail, across(value, median))
+# Scalar median fold-changes for inline reporting
+hv_fold_median <- nb_estimates_medians |>
+  filter(taxon_type_detail == "Human virus") |>
+  pull(value)
+ref_fold_median <- nb_estimates_medians |>
+  filter(taxon_type_detail == "Human-associated taxon") |>
+  pull(value)
+# Per-taxon fold-change lookup for inline reporting
+nb_fold <- nb_estimates |>
+  select(taxon_name_plot, value) |>
+  deframe()
 ```
 
 We quantified these differences using negative-binomial regression to estimate the fold-change in mean relative abundance between airplane wastewater and municipal influent (@fig-model-hv-and-ref, @tbl-model-estimates).
-Human viruses showed a 13-fold median increase in relative abundance in airplane wastewater (range: 5.5-fold for _Sapovirus_ to 120-fold for _Alphacoronavirus_).
-Other human-associated taxa showed a similar enrichment, with a 24-fold median increase (range: 4.6-fold for _Homo sapiens_ to 110-fold for PMMoV).
+Human viruses showed a `r signif(hv_fold_median, 2)`-fold median increase in relative abundance in airplane wastewater (range: `r signif(nb_fold["Sapovirus"], 2)`-fold for _Sapovirus_ to `r signif(nb_fold["Alphacoronavirus"], 2)`-fold for _Alphacoronavirus_).
+Other human-associated taxa showed a similar enrichment, with a `r signif(ref_fold_median, 2)`-fold median increase (range: `r signif(nb_fold["Homo sapiens"], 2)`-fold for _Homo sapiens_ to `r signif(nb_fold["Pepper mild mottle virus"], 2)`-fold for PMMoV).
 In contrast, sewer-associated bacteria except _Acinetobacter_ showed decreases of a similar magnitude.
 
 
@@ -1097,8 +1108,8 @@ This observation suggests that the difference in _Betacoronavirus_ relative abun
 
 # Discussion
 
-For the airport and treatment plant studied, relative abundance of human viruses in untargeted viral MGS data from composite airplane wastewater exceeded that in municipal wastewater by 5.5- to 120-fold (median 13-fold) across 10 diverse genera.
-Comparable increases occurred in non-ribosomal relative abundances for 7 other human-associated taxa, with decreases of a similar magnitude in 4 of 5 sewer-associated bacteria.
+For the airport and treatment plant studied, relative abundance of human viruses in untargeted viral MGS data from composite airplane wastewater exceeded that in municipal wastewater by `r signif(nb_fold["Sapovirus"], 2)`- to `r signif(nb_fold["Alphacoronavirus"], 2)`-fold (median `r signif(hv_fold_median, 2)`-fold) across 10 diverse genera.
+Comparable increases occurred in non-ribosomal relative abundances for 6 other human-associated taxa, with decreases of a similar magnitude in 4 of 5 sewer-associated bacteria.
 While higher infection rates among travelers might explain increases in individual viruses, the consistent pattern across taxa suggests a systematic difference between sample types which elevates the relative abundance of human-associated taxa.
 We therefore predict that similar increases would apply for a novel, emerging virus.
 
@@ -1111,7 +1122,7 @@ The reduced rRNA fraction in airplane samples was partly due to more efficient r
 This efficiency difference could be explained by reduced RNA input in airplane samples or depletion probes having poorer coverage of sewer- than human-derived bacteria ([Supplemental material](#sec-ribodepletion)).
 Before ribodepletion, airplane samples had much lower RNA concentrations (but not DNA) than municipal samples (@fig-qubit), suggesting selective RNA degradation.
 Since filtration removes intact cells, leaving primarily extracellular bacterial RNA, higher pH in airplane wastewater (@filho2017nutr, @hjelmso2019meta) might selectively degrade cell-free bacterial RNA while preserving encapsulated viral RNA.
-Yet, this does not explain the 22-fold increase in the human-associated genus _Bacteroides_.
+Yet, this does not explain the `r signif(nb_fold["Bacteroides"], 2)`-fold increase in the human-associated genus _Bacteroides_.
 Clarifying the mechanism could suggest future protocol improvements.
 
 While human viruses consistently had higher relative abundance in airplane samples, the magnitude of the increase varied.
@@ -1133,7 +1144,7 @@ For a hypothetical weekly incidence of $10^{-3}$ (1 in 1000), this estimate impl
 Our results lower expectations for the sequencing depth required for effective MGS early-warning systems using airplane wastewater.
 Without infection data, we cannot estimate conversion factors like @grimm2025infe.
 However, the higher relative abundances we observe across viruses provides strong evidence that conversion factors are typically higher in airplane than municipal samples for these sites and MGS protocols.
-Assuming the observed median 13-fold increase applies, the required sequencing for 3 SARS-CoV-2 reads drops from `r (3 / (1e-3 * 2e-6)) / 1e9` billion to `r signif((3 / (1e-3 * 2e-6 * 13)) / 1e6, 2)` million, significantly lowering sequencing costs, sample preparation needs, and computational burden.
+Assuming the observed median `r signif(hv_fold_median, 2)`-fold increase applies, the required sequencing for 3 SARS-CoV-2 reads drops from `r (3 / (1e-3 * 2e-6)) / 1e9` billion to `r signif((3 / (1e-3 * 2e-6 * signif(hv_fold_median, 2))) / 1e6, 2)` million, significantly lowering sequencing costs, sample preparation needs, and computational burden.
 Importantly, larger conversion factors provide a cost and/or sensitivity benefit for MGS-based early warning that is independent of (and compounds with) any advantage in the form of higher infection rates among travelers which may be expected during the early stages of a pandemic.
 
 Importantly, this analysis ignores the randomness inherent in pathogen detection.
