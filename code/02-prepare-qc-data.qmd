@@ -108,6 +108,7 @@ qubit <- qubit_raw |>
       conc_chr %in% c("Low OOR", "High OOR") ~ conc_chr,
       TRUE ~ "In range"
     ),
+    # Extra volume was used for the RNA assay on 2024-02-22
     input_volume = case_when(
       measurement_date == as.Date("2024-02-22") & assay == "Qubit HS RNA (ng/uL)" ~ 5,
       TRUE ~ 2
