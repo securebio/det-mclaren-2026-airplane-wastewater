@@ -58,13 +58,16 @@ for file-level details.
 3. **Render the manuscript.** From the repository root:
 
    ```sh
+   # Render html and pdf output formats
+   quarto render manuscript/index.qmd
+   # Or, render just one or the other output format
    quarto render manuscript/index.qmd --to html
+   quarto render manuscript/index.qmd --to pdf
    ```
 
-   The first render fits Bayesian negative-binomial models with `rstanarm`
-   and takes on the order of 10–30 minutes. The fits are cached to
-   `manuscript/_output/nb-fits.rds`; subsequent renders reuse the cache
-   and are fast.
+   The first render fits Bayesian negative-binomial models with `rstanarm`.
+   The fits are cached to `manuscript/_output/nb-fits.rds`; subsequent renders
+   reuse the cache.
 
 ## Provenance
 
