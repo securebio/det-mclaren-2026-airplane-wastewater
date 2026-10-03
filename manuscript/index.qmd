@@ -1165,7 +1165,7 @@ Protocol optimizations to reduce the ratio of off-target RNA may reduce the gap 
 Improvement in the removal of intact bacterial cells, the digestion of unencapsulated RNA, or ribodepletion efficiency could reduce bacterial RNA concentrations.
 Such improvements may especially improve viral relative abundances in municipal samples, where the concentration of bacterial RNA is greater.
 Alternatively (or in addition), pan-viral probe-capture panels can be used to enrich viruses with sufficient sequence similarity to known human viruses prior to sequencing (@tisza2023wast, @kantor2024cons, @mechikoff2025appl, @grimm2025infe).
-Prove-based enrichment is imperfect and tends to have a multiplicative effect on viral relative abundances (@kantor2024cons); thus, we expect airplane wastewater would retain its relative abundance advantage, but the magnitude and/or practical consequences of the difference may be reduced.
+Probe-based enrichment is imperfect and tends to have a multiplicative effect on viral relative abundances (@kantor2024cons); thus, we expect airplane wastewater would retain its relative abundance advantage, but the magnitude and/or practical consequences of the difference may be reduced.
 Alternatively, municipal MGS monitoring could specifically target sites with naturally lower relative concentrations of sewer-derived microbes.
 Yet a third approach would be to look for municipal sampling locations that naturally have a higher ratio of human- to sewer-derived microbes.
 
